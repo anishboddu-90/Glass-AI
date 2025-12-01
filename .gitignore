@@ -1,0 +1,5 @@
+*.exe
+bin/
+obj/
+.DS_Store
+*.log
