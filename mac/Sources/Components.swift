@@ -1,211 +1,353 @@
 import AppKit
 import SwiftUI
 
-// MARK: - The glass
+// MARK: - Palette & motion
 
-/// Real Liquid Glass on macOS 26+ (live refraction of whatever is behind the window),
-/// tinted with your color. Falls back to a tinted behind-window blur on older macOS.
-struct GlassSurface: View {
-    @EnvironmentObject var s: Settings
-    var radius: CGFloat
+enum UI {
+    static let radius: CGFloat = 26
+    static let text = Color.white
+    static let dim = Color.white.opacity(0.62)
+    static let faint = Color.white.opacity(0.38)
+    static let hair = Color.white.opacity(0.14)
+    static let fill = Color.white.opacity(0.08)
+    static let fillHover = Color.white.opacity(0.15)
+    static let accent = LinearGradient(colors: [Color(hex: "#8FE3FF")!, Color(hex: "#A98BFF")!, Color(hex: "#FF9ED8")!],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing)
+    static let spring = Animation.spring(response: 0.42, dampingFraction: 0.8)
+    static let snappy = Animation.spring(response: 0.28, dampingFraction: 0.72)
+    static let soft = Animation.easeOut(duration: 0.22)
+}
+
+// MARK: - Liquid glass
+
+/// Real Liquid Glass (live refraction by the system) on macOS 26; layered vibrancy before that.
+struct GlassSurface<S: InsettableShape>: View {
+    var shape: S
+    var tint: Color
+    var strength: Double
+    var style: String
+    var glow: Color? = nil
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
-        let tint = s.tintColor.opacity(s.tintStrength)
         ZStack {
-            if s.glassStyle == "frosted" {
-                BehindWindowBlur(material: .hudWindow).clipShape(shape)
+            base
+            // edge glow: violet while thinking, red while listening
+            if let glow {
+                shape.strokeBorder(glow.opacity(0.85), lineWidth: 1.6)
+                    .blur(radius: 6)
+                    .transition(.opacity)
             }
-            liquid(shape, tint)
-            // crisp rim light, brighter top-left like real glass catching light
-            shape.strokeBorder(
-                LinearGradient(colors: [.white.opacity(0.6), .white.opacity(0.08), .white.opacity(0.04), .white.opacity(0.35)],
-                               startPoint: .topLeading, endPoint: .bottomTrailing),
-                lineWidth: 1)
-            // soft gloss toward the top
-            shape.fill(LinearGradient(colors: [.white.opacity(0.07), .clear], startPoint: .top, endPoint: .center))
-                .allowsHitTesting(false)
         }
+        .animation(UI.soft, value: glow == nil)
     }
 
-    @ViewBuilder
-    private func liquid(_ shape: RoundedRectangle, _ tint: Color) -> some View {
+    @ViewBuilder private var base: some View {
         #if compiler(>=6.2)
         if #available(macOS 26.0, *) {
-            Color.clear.glassEffect(s.glassStyle == "clear" ? Glass.clear.tint(tint) : Glass.regular.tint(tint), in: shape)
+            ZStack {
+                if style == "frosted" { VisualEffect(material: .hudWindow).clipShape(shape) }
+                Color.clear
+                    .glassEffect(style == "clear" ? .clear.tint(tint.opacity(strength)) : .regular.tint(tint.opacity(strength)),
+                                 in: shape)
+            }
         } else {
-            fallback(shape, tint)
+            fallback
         }
         #else
-        fallback(shape, tint)
+        fallback
         #endif
     }
 
-    private func fallback(_ shape: RoundedRectangle, _ tint: Color) -> some View {
-        BehindWindowBlur(material: s.glassStyle == "clear" ? .underWindowBackground : .hudWindow)
-            .clipShape(shape)
-            .overlay(shape.fill(tint))
+    private var fallback: some View {
+        ZStack {
+            VisualEffect(material: style == "clear" ? .underWindowBackground : .hudWindow)
+            tint.opacity(strength)
+            // glossy top sheen + rim light so it reads as glass, not frosted plastic
+            LinearGradient(colors: [.white.opacity(0.16), .clear, .clear, .white.opacity(0.05)],
+                           startPoint: .top, endPoint: .bottom)
+        }
+        .clipShape(shape)
+        .overlay(shape.strokeBorder(
+            LinearGradient(colors: [.white.opacity(0.55), .white.opacity(0.08), .white.opacity(0.22)],
+                           startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1))
     }
 }
 
-struct BehindWindowBlur: NSViewRepresentable {
+struct VisualEffect: NSViewRepresentable {
     var material: NSVisualEffectView.Material
     func makeNSView(context: Context) -> NSVisualEffectView {
         let v = NSVisualEffectView()
+        v.material = material
         v.blendingMode = .behindWindow
         v.state = .active
-        v.material = material
         return v
     }
     func updateNSView(_ v: NSVisualEffectView, context: Context) { v.material = material }
 }
 
-// MARK: - Shared bits
-
-let orbGradient = LinearGradient(colors: [Color(red: 0.60, green: 0.90, blue: 1.0),
-                                          Color(red: 0.71, green: 0.61, blue: 1.0),
-                                          Color(red: 1.0, green: 0.66, blue: 0.85)],
-                                 startPoint: .topLeading, endPoint: .bottomTrailing)
-
-struct Orb: View {
-    var size: CGFloat
-    var glow = false
-    var body: some View {
-        Circle().fill(orbGradient).frame(width: size, height: size)
-            .overlay(Circle().fill(LinearGradient(colors: [.white.opacity(0.55), .clear], startPoint: .top, endPoint: .center))
-                .padding(size * 0.12).blur(radius: size * 0.08))
-            .shadow(color: glow ? Color(red: 0.71, green: 0.61, blue: 1.0).opacity(0.7) : .clear, radius: size * 0.5)
+/// Small glass chip used for buttons, bubbles and menus.
+struct Chip: ViewModifier {
+    var radius: CGFloat = 12
+    var hover = false
+    var selected = false
+    func body(content: Content) -> some View {
+        content.background(
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .fill(Color.white.opacity(selected ? 0.22 : hover ? 0.15 : 0.08))
+                .overlay(RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .strokeBorder(Color.white.opacity(selected ? 0.35 : 0.12), lineWidth: 0.8)))
     }
 }
 
-/// Round icon button with hover highlight.
+extension View {
+    func chip(_ radius: CGFloat = 12, hover: Bool = false, selected: Bool = false) -> some View {
+        modifier(Chip(radius: radius, hover: hover, selected: selected))
+    }
+
+    /// Fade + rise in with an optional delay — used for staggered entrances everywhere.
+    func appear(_ delay: Double = 0, y: CGFloat = 10) -> some View { modifier(Appear(delay: delay, y: y)) }
+}
+
+struct Appear: ViewModifier {
+    var delay: Double
+    var y: CGFloat
+    @State private var on = false
+    func body(content: Content) -> some View {
+        content
+            .opacity(on ? 1 : 0)
+            .offset(y: on ? 0 : y)
+            .scaleEffect(on ? 1 : 0.97)
+            .onAppear { withAnimation(UI.spring.delay(delay)) { on = true } }
+    }
+}
+
+// MARK: - Buttons
+
 struct IconButton: View {
     var symbol: String
     var help: String
+    var size: CGFloat = 30
+    var active = false
+    var tint: Color = .white
     var action: () -> Void
     @State private var hover = false
+    @State private var pressed = false
+
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 13, weight: .medium))
-                .frame(width: 30, height: 30)
-                .background(Circle().fill(.white.opacity(hover ? 0.16 : 0)))
-                .overlay(Circle().strokeBorder(.white.opacity(hover ? 0.2 : 0), lineWidth: 1))
+                .font(.system(size: size * 0.45, weight: .semibold))
+                .foregroundStyle(active ? tint : tint.opacity(hover ? 1 : 0.78))
+                .frame(width: size, height: size)
+                .background(Circle().fill(Color.white.opacity(active ? 0.22 : hover ? 0.14 : 0)))
                 .contentShape(Circle())
+                .scaleEffect(pressed ? 0.86 : hover ? 1.08 : 1)
+                .symbolEffectBounce(active)
         }
-        .buttonStyle(PressStyle())
-        .foregroundStyle(.white.opacity(0.9))
-        .onHover { hover = $0 }
+        .buttonStyle(.plain)
         .help(help)
+        .onHover { h in withAnimation(UI.snappy) { hover = h } }
+        .simultaneousGesture(DragGesture(minimumDistance: 0)
+            .onChanged { _ in withAnimation(UI.snappy) { pressed = true } }
+            .onEnded { _ in withAnimation(UI.snappy) { pressed = false } })
     }
 }
 
-struct PressStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.92 : 1)
-            .animation(.spring(response: 0.25, dampingFraction: 0.6), value: configuration.isPressed)
+extension View {
+    @ViewBuilder func symbolEffectBounce(_ v: Bool) -> some View {
+        if #available(macOS 14.0, *) { self.symbolEffect(.bounce, value: v) } else { self }
     }
 }
 
-/// Glass pill used for options, chips, suggestion buttons.
-struct Pill<Label: View>: View {
+struct PillButton: View {
+    var title: String
+    var symbol: String? = nil
     var selected = false
     var action: () -> Void
-    @ViewBuilder var label: () -> Label
     @State private var hover = false
     var body: some View {
         Button(action: action) {
-            label()
-                .font(.system(size: 12.5))
-                .padding(.horizontal, 13).padding(.vertical, 7)
-                .background(Capsule().fill(.white.opacity(selected ? 0.30 : (hover ? 0.14 : 0.08))))
-                .overlay(Capsule().strokeBorder(.white.opacity(selected ? 0.55 : (hover ? 0.35 : 0.18)), lineWidth: 1))
-                .contentShape(Capsule())
+            HStack(spacing: 6) {
+                if let symbol { Image(systemName: symbol).font(.system(size: 11, weight: .semibold)) }
+                Text(title).font(.system(size: 12, weight: .medium))
+            }
+            .foregroundStyle(selected ? .white : UI.dim)
+            .padding(.horizontal, 11).padding(.vertical, 6)
+            .chip(14, hover: hover, selected: selected)
+            .scaleEffect(hover ? 1.03 : 1)
         }
-        .buttonStyle(PressStyle())
-        .foregroundStyle(.white)
-        .onHover { hover = $0 }
+        .buttonStyle(.plain)
+        .onHover { h in withAnimation(UI.snappy) { hover = h } }
     }
 }
 
-extension Pill where Label == Text {
-    init(_ title: String, selected: Bool = false, action: @escaping () -> Void) {
-        self.selected = selected
-        self.action = action
-        self.label = { Text(title) }
+struct HoverRow<Content: View>: View {
+    var selected = false
+    var action: () -> Void
+    @ViewBuilder var content: (Bool) -> Content
+    @State private var hover = false
+    var body: some View {
+        Button(action: action) {
+            content(hover)
+                .padding(.horizontal, 10).padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.white.opacity(selected ? 0.16 : hover ? 0.09 : 0)))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { h in withAnimation(UI.soft) { hover = h } }
     }
 }
 
-/// Wrapping row layout (chips, swatches, model lists).
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let maxW = proposal.width ?? .infinity
-        var x: CGFloat = 0, y: CGFloat = 0, rowH: CGFloat = 0, widest: CGFloat = 0
-        for v in subviews {
-            let sz = v.sizeThatFits(.unspecified)
-            if x > 0 && x + sz.width > maxW { x = 0; y += rowH + spacing; rowH = 0 }
-            x += sz.width + spacing; rowH = max(rowH, sz.height); widest = max(widest, x - spacing)
+// MARK: - The orb (Glass's "face")
+
+enum OrbState { case idle, thinking, listening, speaking }
+
+struct Orb: View {
+    var size: CGFloat
+    var state: OrbState = .idle
+    var level: Float = 0
+
+    var body: some View {
+        TimelineView(.animation) { tl in
+            let t = tl.date.timeIntervalSinceReferenceDate
+            let speed: Double = state == .thinking ? 2.6 : state == .idle ? 0.5 : 1.4
+            let breathe = state == .listening ? 1 + Double(level) * 0.22 : 1 + 0.045 * sin(t * (state == .thinking ? 5 : 1.6))
+            ZStack {
+                Circle()
+                    .fill(AngularGradient(colors: colors + [colors[0]], center: .center, angle: .degrees(t * 40 * speed)))
+                    .blur(radius: size * 0.08)
+                Circle()
+                    .fill(RadialGradient(colors: [.white.opacity(0.75), .clear], center: UnitPoint(x: 0.35, y: 0.28),
+                                         startRadius: 0, endRadius: size * 0.45))
+                Circle().strokeBorder(Color.white.opacity(0.55), lineWidth: max(0.6, size * 0.025))
+            }
+            .frame(width: size, height: size)
+            .scaleEffect(breathe)
+            .shadow(color: colors[1].opacity(state == .idle ? 0.35 : 0.7), radius: size * (state == .idle ? 0.25 : 0.45))
         }
-        return CGSize(width: min(widest, maxW), height: y + rowH)
+        .frame(width: size, height: size)
     }
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var x = bounds.minX, y = bounds.minY, rowH: CGFloat = 0
-        for v in subviews {
-            let sz = v.sizeThatFits(.unspecified)
-            if x > bounds.minX && x + sz.width > bounds.maxX { x = bounds.minX; y += rowH + spacing; rowH = 0 }
-            v.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(sz))
-            x += sz.width + spacing; rowH = max(rowH, sz.height)
+
+    private var colors: [Color] {
+        switch state {
+        case .listening: return [Color(hex: "#FF6B6B")!, Color(hex: "#FF9F7A")!, Color(hex: "#FF4F9A")!]
+        case .speaking: return [Color(hex: "#6BFFC8")!, Color(hex: "#7AD7FF")!, Color(hex: "#A98BFF")!]
+        default: return [Color(hex: "#8FE3FF")!, Color(hex: "#A98BFF")!, Color(hex: "#FF9ED8")!]
         }
     }
 }
 
-// MARK: - Markdown for replies (headings, lists, quotes, code blocks, inline styles)
+// MARK: - Activity indicators
 
+struct ThinkingDots: View {
+    var body: some View {
+        TimelineView(.animation) { tl in
+            let t = tl.date.timeIntervalSinceReferenceDate
+            HStack(spacing: 5) {
+                ForEach(0..<3) { i in
+                    let p = sin(t * 6 - Double(i) * 0.7)
+                    Circle().fill(Color.white.opacity(0.55 + 0.4 * p))
+                        .frame(width: 6, height: 6)
+                        .offset(y: -3 * max(0, p))
+                }
+            }
+        }
+    }
+}
+
+/// Text with a light sweep moving across it.
+struct Shimmer: View {
+    var text: String
+    var body: some View {
+        TimelineView(.animation) { tl in
+            let t = tl.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.8) / 1.8
+            Text(text)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(UI.faint)
+                .overlay(
+                    LinearGradient(colors: [.clear, .white, .clear], startPoint: .leading, endPoint: .trailing)
+                        .frame(width: 60)
+                        .offset(x: CGFloat(t) * 220 - 90)
+                        .mask(Text(text).font(.system(size: 13, weight: .medium)))
+                )
+        }
+    }
+}
+
+struct VoiceBars: View {
+    var level: Float
+    var color: Color = .white
+    var body: some View {
+        TimelineView(.animation) { tl in
+            let t = tl.date.timeIntervalSinceReferenceDate
+            HStack(spacing: 3) {
+                ForEach(0..<14) { i in
+                    let wobble = 0.5 + 0.5 * sin(t * 9 + Double(i) * 0.9)
+                    let h = 4 + CGFloat(level) * 22 * CGFloat(0.35 + 0.65 * wobble)
+                    Capsule().fill(color.opacity(0.85)).frame(width: 3, height: h)
+                }
+            }
+            .frame(height: 28)
+            .animation(.easeOut(duration: 0.08), value: level)
+        }
+    }
+}
+
+struct Toast: View {
+    var text: String
+    var body: some View {
+        Text(text)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14).padding(.vertical, 8)
+            .background(Capsule().fill(Color.black.opacity(0.55)))
+            .overlay(Capsule().strokeBorder(Color.white.opacity(0.18)))
+            .shadow(color: .black.opacity(0.3), radius: 12, y: 4)
+    }
+}
+
+// MARK: - Markdown
+
+/// Block-level Markdown: headings, lists, quotes, rules, and code blocks with a copy button.
+/// Inline styling (bold, italic, code, links) comes from AttributedString.
 struct MarkdownView: View {
     var text: String
+    var streaming = false
 
-    private enum Block { case code(String, String), heading(Int, String), bullet(String, String, Int), quote(String), para(String), rule }
+    enum Block: Hashable { case para(String), heading(String, Int), bullet(String, Int, String), quote(String), code(String, String), rule }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ForEach(Array(blocks().enumerated()), id: \.offset) { _, b in view(b) }
+            ForEach(Array(MarkdownView.parse(text + (streaming ? " ▍" : "")).enumerated()), id: \.offset) { _, b in
+                block(b)
+            }
         }
         .textSelection(.enabled)
     }
 
-    @ViewBuilder private func view(_ b: Block) -> some View {
+    @ViewBuilder private func block(_ b: Block) -> some View {
         switch b {
-        case .code(let lang, let code):
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(lang.isEmpty ? "code" : lang).font(.system(size: 11)).foregroundStyle(.white.opacity(0.6))
-                    Spacer()
-                    Button { copy(code) } label: { Image(systemName: "doc.on.doc").font(.system(size: 11)) }
-                        .buttonStyle(.plain).foregroundStyle(.white.opacity(0.6)).help("Copy code")
-                }
-                ScrollView(.horizontal, showsIndicators: false) {
-                    Text(code).font(.system(size: 12.5, design: .monospaced)).foregroundStyle(.white.opacity(0.95))
-                }
+        case .para(let s):
+            inline(s).font(.system(size: 13.5)).lineSpacing(3)
+        case .heading(let s, let level):
+            inline(s).font(.system(size: level == 1 ? 18 : level == 2 ? 16 : 14.5, weight: .bold)).padding(.top, 4)
+        case .bullet(let s, let indent, let mark):
+            HStack(alignment: .firstTextBaseline, spacing: 7) {
+                Text(mark).font(.system(size: 13.5, weight: .semibold)).foregroundStyle(UI.dim)
+                inline(s).font(.system(size: 13.5)).lineSpacing(3)
             }
-            .padding(12)
-            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.black.opacity(0.28)))
-            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.white.opacity(0.12)))
-        case .heading(let level, let t):
-            inline(t).font(.system(size: level == 1 ? 19 : level == 2 ? 17 : 15, weight: .semibold)).padding(.top, 4)
-        case .bullet(let marker, let t, let indent):
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(marker).foregroundStyle(.white.opacity(0.6))
-                inline(t)
-            }.padding(.leading, CGFloat(indent) * 16 + 4)
-        case .quote(let t):
-            inline(t).foregroundStyle(.white.opacity(0.75)).padding(.leading, 10)
-                .overlay(Rectangle().fill(.white.opacity(0.4)).frame(width: 2), alignment: .leading)
-        case .para(let t):
-            inline(t)
+            .padding(.leading, CGFloat(indent) * 14)
+        case .quote(let s):
+            HStack(spacing: 10) {
+                Capsule().fill(UI.accent).frame(width: 3)
+                inline(s).font(.system(size: 13.5)).foregroundStyle(UI.dim)
+            }
+        case .code(let lang, let code):
+            CodeBlock(lang: lang, code: code)
         case .rule:
-            Rectangle().fill(.white.opacity(0.18)).frame(height: 1).padding(.vertical, 4)
+            Rectangle().fill(UI.hair).frame(height: 1).padding(.vertical, 4)
         }
     }
 
@@ -215,50 +357,133 @@ struct MarkdownView: View {
         return Text(s)
     }
 
-    private func copy(_ s: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(s, forType: .string)
-    }
-
-    private func blocks() -> [Block] {
+    static func parse(_ md: String) -> [Block] {
         var out: [Block] = []
-        let lines = text.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n")
-        var i = 0
         var para: [String] = []
+        var code: [String]? = nil
+        var lang = ""
         func flush() { if !para.isEmpty { out.append(.para(para.joined(separator: "\n"))); para = [] } }
-        while i < lines.count {
-            let line = lines[i]
-            let t = line.trimmingCharacters(in: .whitespaces)
-            if t.hasPrefix("```") {
-                flush()
-                let lang = String(t.dropFirst(3)).trimmingCharacters(in: .whitespaces)
-                var code: [String] = []
-                i += 1
-                while i < lines.count && !lines[i].trimmingCharacters(in: .whitespaces).hasPrefix("```") { code.append(lines[i]); i += 1 }
-                i += 1
-                out.append(.code(lang, code.joined(separator: "\n")))
+
+        for raw in md.components(separatedBy: "\n") {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("```") {
+                if code != nil { out.append(.code(lang, code!.joined(separator: "\n"))); code = nil }
+                else { flush(); code = []; lang = String(line.dropFirst(3)) }
                 continue
             }
-            if t.isEmpty { flush(); i += 1; continue }
-            if let r = t.range(of: #"^#{1,6}\s+"#, options: .regularExpression) {
-                flush()
-                out.append(.heading(t[r].filter { $0 == "#" }.count, String(t[r.upperBound...])))
-                i += 1; continue
+            if code != nil { code!.append(raw); continue }
+            if line.isEmpty { flush(); continue }
+            let indent = (raw.prefix { $0 == " " }.count) / 2
+            if line.hasPrefix("#") {
+                let n = line.prefix { $0 == "#" }.count
+                if n <= 6, line.dropFirst(n).hasPrefix(" ") { flush(); out.append(.heading(String(line.dropFirst(n + 1)), n)); continue }
             }
-            if t.range(of: #"^([-*_])\1{2,}$"#, options: .regularExpression) != nil { flush(); out.append(.rule); i += 1; continue }
-            if let r = line.range(of: #"^\s*([-*+]|\d+[.)])\s+"#, options: .regularExpression) {
-                flush()
-                let lead = line.prefix { $0 == " " || $0 == "\t" }.count
-                let markerRaw = line[r].trimmingCharacters(in: .whitespaces)
-                let marker = markerRaw.first?.isNumber == true ? markerRaw.replacingOccurrences(of: ")", with: ".") : "•"
-                out.append(.bullet(marker, String(line[r.upperBound...]), lead / 2))
-                i += 1; continue
+            if line == "---" || line == "***" || line == "___" { flush(); out.append(.rule); continue }
+            if line.hasPrefix("> ") { flush(); out.append(.quote(String(line.dropFirst(2)))); continue }
+            if line.hasPrefix("- [ ] ") || line.hasPrefix("- [x] ") || line.hasPrefix("- [X] ") {
+                flush(); out.append(.bullet(String(line.dropFirst(6)), indent, line.hasPrefix("- [ ]") ? "☐" : "☑")); continue
             }
-            if t.hasPrefix(">") { flush(); out.append(.quote(String(t.drop { $0 == ">" || $0 == " " }))); i += 1; continue }
+            if line.hasPrefix("- ") || line.hasPrefix("* ") || line.hasPrefix("+ ") {
+                flush(); out.append(.bullet(String(line.dropFirst(2)), indent, "•")); continue
+            }
+            if let r = line.range(of: #"^\d+[.)] "#, options: .regularExpression) {
+                flush(); out.append(.bullet(String(line[r.upperBound...]), indent, String(line[r]).trimmingCharacters(in: .whitespaces))); continue
+            }
             para.append(line)
-            i += 1
         }
+        if let code { out.append(.code(lang, code.joined(separator: "\n"))) }
         flush()
         return out
+    }
+}
+
+struct CodeBlock: View {
+    var lang: String
+    var code: String
+    @State private var copied = false
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text(lang.isEmpty ? "code" : lang).font(.system(size: 11, weight: .medium)).foregroundStyle(UI.faint)
+                Spacer()
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(code, forType: .string)
+                    withAnimation(UI.snappy) { copied = true }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { withAnimation(UI.soft) { copied = false } }
+                } label: {
+                    Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
+                        .font(.system(size: 11, weight: .medium)).foregroundStyle(copied ? .green : UI.dim)
+                        .contentTransition(.symbolEffectIfAvailable)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 7)
+            .background(Color.white.opacity(0.05))
+            ScrollView(.horizontal, showsIndicators: false) {
+                Text(code).font(.system(size: 12, design: .monospaced)).foregroundStyle(.white.opacity(0.92))
+                    .padding(12)
+            }
+        }
+        .background(Color.black.opacity(0.32))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(UI.hair))
+    }
+}
+
+extension ContentTransition {
+    static var symbolEffectIfAvailable: ContentTransition {
+        if #available(macOS 14.0, *) { return .symbolEffect(.replace) }
+        return .opacity
+    }
+}
+
+// MARK: - Attachments
+
+struct AttachmentChip: View {
+    var a: Attachment
+    var onRemove: (() -> Void)? = nil
+    var large = false
+    @State private var hover = false
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Group {
+                if let img = a.thumbnail {
+                    Image(nsImage: img).resizable().aspectRatio(contentMode: .fill)
+                        .frame(width: large ? 180 : 56, height: large ? 120 : 56)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                } else {
+                    HStack(spacing: 8) {
+                        Image(systemName: a.kind == "pdf" ? "doc.richtext" : "doc.text")
+                            .font(.system(size: 16)).foregroundStyle(UI.accent)
+                            .frame(width: 30, height: 30)
+                            .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.1)))
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(a.name).font(.system(size: 12, weight: .medium)).lineLimit(1)
+                            Text("\(a.kind.uppercased()) · \(Attachments.sizeText(a.bytes))").font(.system(size: 10.5)).foregroundStyle(UI.faint)
+                        }
+                    }
+                    .padding(.horizontal, 10).frame(height: 56).frame(maxWidth: 190)
+                    .chip(12)
+                }
+            }
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(UI.hair))
+            .scaleEffect(hover ? 1.03 : 1)
+
+            if let onRemove {
+                Button(action: onRemove) {
+                    Image(systemName: "xmark").font(.system(size: 8, weight: .bold))
+                        .frame(width: 18, height: 18)
+                        .background(Circle().fill(Color.black.opacity(0.75)))
+                        .overlay(Circle().strokeBorder(Color.white.opacity(0.3)))
+                }
+                .buttonStyle(.plain)
+                .offset(x: 6, y: -6)
+                .opacity(hover ? 1 : 0.0001)
+            }
+        }
+        .onHover { h in withAnimation(UI.snappy) { hover = h } }
+        .help(a.name)
     }
 }

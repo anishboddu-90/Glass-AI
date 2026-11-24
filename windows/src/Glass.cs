@@ -65,14 +65,16 @@ namespace GlassSidebar
 
     internal static unsafe class Glass
     {
-        // ---------- Blur (separable box blur, run twice ~ gaussian) ----------
+        // ---------- Blur (separable box blur, run three times ~ smooth gaussian) ----------
         public static void Blur(IntPtr a, IntPtr b, int w, int h, ValidRect v, int radius)
         {
             if (radius < 1) return;
-            for (int i = 0; i < 2; i++)
+            int passes = radius > 4 ? 3 : 2;
+            int r = Math.Max(1, (int)Math.Round(radius * (passes == 3 ? 0.8 : 1.0)));
+            for (int i = 0; i < passes; i++)
             {
-                BlurH(a, b, w, v, radius);
-                BlurV(b, a, w, v, radius);
+                BlurH(a, b, w, v, r);
+                BlurV(b, a, w, v, r);
             }
         }
 
@@ -147,21 +149,23 @@ namespace GlassSidebar
         }
 
         // ---------- Liquid glass refraction ----------
-        // src: blurred backdrop (bw x bh), output pixel (x,y) maps to src (x+m, y+m).
-        // The panel is a rounded rect; near the rim a convex "bezel" bends light outward,
-        // so content from beyond the edge is pulled into the rim, with RGB split (dispersion)
-        // and a specular rim light.
+        // src: blurred backdrop, output pixel (x,y) maps to src (x+m, y+m).
+        // The panel is a rounded rect; near the rim a convex bezel bends light outward, so content
+        // from beyond the edge is pulled into the rim, with RGB dispersion, an inner shadow,
+        // a specular rim light and a glossy top. 'glow' adds a soft colored edge light (0..1).
         public static void Refract(IntPtr srcP, int bw, ValidRect v, int m,
                                    IntPtr dstP, int dstStride, int ow, int oh,
                                    float radius, float bezel, float amp, float scale,
-                                   float tintA, byte tintR, byte tintG, byte tintB)
+                                   float tintA, byte tintR, byte tintG, byte tintB,
+                                   float glow, byte glowR, byte glowG, byte glowB)
         {
             float hw = ow * 0.5f, hh = oh * 0.5f;
             float r = Math.Min(radius, Math.Min(hw, hh));
             const float Lx = -0.6f, Ly = -0.8f; // light from top-left
             float rimW = 1.4f * scale + 0.6f;
             int vx0 = v.X0, vx1 = v.X1 - 1, vy0 = v.Y0, vy1 = v.Y1 - 1;
-            float sat = 1.18f;
+            const float sat = 1.18f;
+            float glowW = 26f * scale;
 
             Parallel.For(0, oh, y =>
             {
@@ -193,6 +197,7 @@ namespace GlassSidebar
 
                     int bx = x + m, by = y + m;
                     float cr, cg, cb, spec;
+                    float dir = nx * Lx + ny * Ly;
                     if (d < bezel)
                     {
                         float t = 1f - d / bezel;
@@ -202,7 +207,6 @@ namespace GlassSidebar
                         uint pb = Sample(src, bw, bx + nx * disp * 0.86f, by + ny * disp * 0.86f, vx0, vx1, vy0, vy1);
                         cr = (pr >> 16) & 255; cg = (pg >> 8) & 255; cb = pb & 255;
 
-                        float dir = nx * Lx + ny * Ly;
                         float lit = Math.Max(dir, -dir * 0.55f);
                         float rim = d < rimW ? 1f - d / rimW : 0f;
                         spec = rim * (0.30f + 0.70f * lit) + t * t * t * 0.26f * lit;
@@ -219,16 +223,23 @@ namespace GlassSidebar
                     cr = lum + (cr - lum) * sat; cg = lum + (cg - lum) * sat; cb = lum + (cb - lum) * sat;
                     cr += (tintR - cr) * tintA; cg += (tintG - cg) * tintA; cb += (tintB - cb) * tintA;
 
-                    // thickness: real glass looks a bit darker just inside its edge (inner shadow),
-                    // strongest on the side facing away from the light
+                    // inner shadow: thick glass darkens just inside its edge, more on the side away from the light
                     float band = bezel * 1.8f;
                     if (d < band)
                     {
                         float k = 1f - d / band;
-                        float away = Math.Max(0f, -(nx * Lx + ny * Ly));
+                        float away = Math.Max(0f, -dir);
                         float shade = k * k * (0.10f + 0.12f * away);
                         cr *= 1f - shade; cg *= 1f - shade; cb *= 1f - shade;
                     }
+
+                    // colored edge glow (used while listening / thinking)
+                    if (glow > 0f && d < glowW)
+                    {
+                        float g = (1f - d / glowW); g = g * g * glow * 0.55f;
+                        cr += (glowR - cr) * g; cg += (glowG - cg) * g; cb += (glowB - cb) * g;
+                    }
+
                     spec += sheen;
                     if (spec > 1f) spec = 1f;
                     cr += (255f - cr) * spec; cg += (255f - cg) * spec; cb += (255f - cb) * spec;

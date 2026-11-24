@@ -8,8 +8,7 @@ using System.Windows.Threading;
 
 namespace GlassSidebar
 {
-    // Glass tint / blur controls. Everything applies live (the render loop reads settings every frame)
-    // and is saved automatically a moment after you stop fiddling.
+    // Glass tint / blur and voice settings. Everything applies live and is saved automatically.
     internal sealed partial class SidebarWindow
     {
         static readonly object[][] TintPresets =
@@ -26,8 +25,9 @@ namespace GlassSidebar
         };
         const double DefaultTintStrength = 0.42, DefaultBlur = 9;
 
-        Slider tintSlider, blurSlider;
+        Slider tintSlider, blurSlider, rateSlider;
         TextBox tintHex;
+        CheckBox speakSwitch;
         DispatcherTimer appearanceSave;
         bool syncingAppearance;
 
@@ -35,7 +35,9 @@ namespace GlassSidebar
         {
             tintSlider = F<Slider>("TintSlider");
             blurSlider = F<Slider>("BlurSlider");
+            rateSlider = F<Slider>("RateSlider");
             tintHex = F<TextBox>("TintHex");
+            speakSwitch = F<CheckBox>("SpeakSwitch");
 
             var wrap = F<WrapPanel>("TintSwatches");
             foreach (var p in TintPresets)
@@ -46,7 +48,7 @@ namespace GlassSidebar
                 {
                     Width = 30, Height = 30, CornerRadius = new CornerRadius(15),
                     Background = new SolidColorBrush(Color.FromRgb(r, g, b)),
-                    BorderBrush = new SolidColorBrush(Color.FromArgb(0x55, 0xFF, 0xFF, 0xFF)), BorderThickness = new Thickness(1)
+                    BorderBrush = Frozen(Color.FromArgb(0x55, 0xFF, 0xFF, 0xFF)), BorderThickness = new Thickness(1)
                 };
                 var ring = new Border
                 {
@@ -55,7 +57,7 @@ namespace GlassSidebar
                 };
                 var btn = new Button { Content = ring, ToolTip = name, Cursor = Cursors.Hand, Focusable = false, Margin = new Thickness(0, 0, 4, 4) };
                 btn.Template = BareTemplate();
-                btn.Click += delegate { SetTint(r, g, b); };
+                btn.Click += delegate { SetTint(r, g, b); Animate.Pop(ring, 0, 0.8); };
                 wrap.Children.Add(btn);
             }
 
@@ -71,6 +73,19 @@ namespace GlassSidebar
                 settings.Blur = Math.Round(blurSlider.Value);
                 RefreshAppearanceLabels(); QueueAppearanceSave();
             };
+            rateSlider.ValueChanged += delegate
+            {
+                if (syncingAppearance) return;
+                settings.VoiceRate = (int)Math.Round(rateSlider.Value);
+                RefreshAppearanceLabels(); QueueAppearanceSave();
+            };
+            speakSwitch.Checked += delegate { if (!syncingAppearance) { settings.SpeakReplies = true; QueueAppearanceSave(); } };
+            speakSwitch.Unchecked += delegate
+            {
+                if (syncingAppearance) return;
+                settings.SpeakReplies = false; QueueAppearanceSave();
+                if (voice != null) voice.StopSpeaking();
+            };
             tintHex.KeyDown += delegate (object s, KeyEventArgs e) { if (e.Key == Key.Enter) { ApplyHex(); e.Handled = true; } };
             tintHex.LostKeyboardFocus += delegate { ApplyHex(); };
             F<Button>("GlassReset").Click += delegate
@@ -79,12 +94,51 @@ namespace GlassSidebar
                 settings.Blur = DefaultBlur;
                 SetTint(92, 94, 100);
                 SyncAppearanceControls();
+                ShowToast("Glass reset to semi-gray");
             };
+
+            BuildVoiceList();
 
             appearanceSave = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(600) };
             appearanceSave.Tick += delegate { appearanceSave.Stop(); try { settings.Save(); } catch { } };
 
             SyncAppearanceControls();
+        }
+
+        void BuildVoiceList()
+        {
+            var list = F<WrapPanel>("VoiceList");
+            list.Children.Clear();
+            var names = Voice.VoiceNames();
+            if (names.Length == 0)
+            {
+                list.Children.Add(new TextBlock { Text = "No Windows voices installed.", Foreground = DimText, FontSize = 12 });
+                return;
+            }
+            foreach (var n in names)
+            {
+                string name = n;
+                string shortName = name.Replace("Microsoft ", "").Replace(" Desktop", "");
+                var b = new Button { Style = (Style)root.FindResource("PillBtn"), Content = shortName, Margin = new Thickness(0, 0, 6, 6), Tag = name };
+                b.Click += delegate
+                {
+                    settings.VoiceName = name; QueueAppearanceSave(); HighlightVoice();
+                    EnsureVoice(); voice.Speak("Hi, I'm " + shortName.Split(' ')[0] + ".", name, settings.VoiceRate);
+                };
+                list.Children.Add(b);
+            }
+        }
+
+        void HighlightVoice()
+        {
+            string current = settings.VoiceName;
+            foreach (var c in F<WrapPanel>("VoiceList").Children)
+            {
+                var b = c as Button;
+                if (b == null) continue;
+                bool on = (b.Tag as string) == current || (string.IsNullOrEmpty(current) && F<WrapPanel>("VoiceList").Children.IndexOf(b) == 0);
+                b.Background = on ? PillOn : PillOff;
+            }
         }
 
         static ControlTemplate BareTemplate()
@@ -116,6 +170,8 @@ namespace GlassSidebar
             syncingAppearance = true;
             tintSlider.Value = settings.TintStrength;
             blurSlider.Value = settings.Blur;
+            rateSlider.Value = settings.VoiceRate;
+            speakSwitch.IsChecked = settings.SpeakReplies;
             syncingAppearance = false;
 
             var c = Color.FromRgb((byte)settings.TintR, (byte)settings.TintG, (byte)settings.TintB);
@@ -127,6 +183,7 @@ namespace GlassSidebar
                 var ring = (Border)((Button)child).Content;
                 ring.BorderBrush = ((Color)ring.Tag) == c ? Brushes.White : Brushes.Transparent;
             }
+            HighlightVoice();
             RefreshAppearanceLabels();
         }
 
@@ -134,6 +191,7 @@ namespace GlassSidebar
         {
             F<TextBlock>("TintValue").Text = Math.Round(settings.TintStrength / 0.85 * 100) + "%";
             F<TextBlock>("BlurValue").Text = settings.Blur <= 0 ? "Off" : Math.Round(settings.Blur) + " px";
+            F<TextBlock>("RateValue").Text = settings.VoiceRate == 0 ? "Normal" : (settings.VoiceRate > 0 ? "+" : "") + settings.VoiceRate;
         }
 
         void QueueAppearanceSave()

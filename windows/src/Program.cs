@@ -19,6 +19,13 @@ namespace GlassSidebar
                 Native.SetProcessDPIAware();
 
                 var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+                app.DispatcherUnhandledException += (s, e) =>
+                {
+                    // never crash the whole sidebar over one bad frame or reply
+                    e.Handled = true;
+                    try { System.IO.File.AppendAllText(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "GlassSidebar.log"), DateTime.Now + " " + e.Exception + "\n"); } catch { }
+                };
+
                 var win = new SidebarWindow();
                 new WindowInteropHelper(win).EnsureHandle(); // hooks up hotkey + capture exclusion now
 
@@ -34,7 +41,7 @@ namespace GlassSidebar
                 tray.Icon = MakeIcon();
                 tray.Text = "Glass — flick cursor to a screen edge";
                 var menu = new Forms.ContextMenuStrip();
-                menu.Items.Add("Open sidebar (Ctrl+Alt+Space)", null, delegate { OpenFromTray(win); });
+                menu.Items.Add("Open Glass  (Ctrl+Alt+Space)", null, delegate { OpenFromTray(win); });
                 menu.Items.Add("-");
                 menu.Items.Add("Quit", null, delegate { tray.Visible = false; swipe.Dispose(); win.Close(); app.Shutdown(); });
                 tray.ContextMenuStrip = menu;
@@ -53,7 +60,7 @@ namespace GlassSidebar
             win.ShowPanel(1, Forms.Screen.FromPoint(new Drawing.Point(p.X, p.Y)));
         }
 
-        // Little glassy orb for the tray.
+        // little glassy orb for the tray
         static Drawing.Icon MakeIcon()
         {
             var bmp = new Drawing.Bitmap(32, 32);

@@ -2,7 +2,7 @@ import Foundation
 import Security
 import SwiftUI
 
-// MARK: - Keychain (API key lives here, never in plain files)
+// MARK: - Keychain (one key per provider, never in plain files)
 
 enum Keychain {
     static let service = "com.glass.sidebar"
@@ -38,36 +38,54 @@ enum Keychain {
 final class Settings: ObservableObject {
     static let shared = Settings()
     private let d = UserDefaults.standard
+    static let providers = ["anthropic", "gemini", "groq", "openai"]
 
     @Published var provider: String { didSet { d.set(provider, forKey: "provider") } }
     @Published var model: String { didSet { d.set(model, forKey: "model") } }
     @Published var baseURL: String { didSet { d.set(baseURL, forKey: "baseURL") } }
     @Published var systemPrompt: String { didSet { d.set(systemPrompt, forKey: "systemPrompt") } }
     @Published var sensitivity: Int { didSet { d.set(sensitivity, forKey: "sensitivity") } }
-    // glass
     @Published var tintHex: String { didSet { d.set(tintHex, forKey: "tintHex") } }
     @Published var tintStrength: Double { didSet { d.set(tintStrength, forKey: "tintStrength") } }
     @Published var glassStyle: String { didSet { d.set(glassStyle, forKey: "glassStyle") } } // clear | regular | frosted
-
-    @Published var apiKey: String { didSet { Keychain.write("apiKey", apiKey) } }
+    @Published var speakReplies: Bool { didSet { d.set(speakReplies, forKey: "speakReplies") } }
+    @Published var voiceID: String { didSet { d.set(voiceID, forKey: "voiceID") } }
+    @Published var recentModels: [String] { didSet { d.set(recentModels, forKey: "recentModels") } }
+    @Published private(set) var keys: [String: String] = [:]
 
     static let defaultTint = "#5C5E64"   // semi-gray
     static let defaultStrength = 0.42
 
     private init() {
         provider = d.string(forKey: "provider") ?? "anthropic"
-        model = d.string(forKey: "model") ?? "claude-sonnet-5-5"
+        model = d.string(forKey: "model") ?? AI.anthropicDefault
         baseURL = d.string(forKey: "baseURL") ?? "https://api.openai.com/v1"
-        systemPrompt = d.string(forKey: "systemPrompt") ?? "You are a fast, concise assistant living in a sidebar. Keep answers tight."
+        systemPrompt = d.string(forKey: "systemPrompt") ?? "You are Glass, a sharp, friendly assistant that lives in a sidebar. Be concise and use Markdown when it helps."
         sensitivity = d.object(forKey: "sensitivity") as? Int ?? 1
         tintHex = d.string(forKey: "tintHex") ?? Settings.defaultTint
         tintStrength = d.object(forKey: "tintStrength") as? Double ?? Settings.defaultStrength
         glassStyle = d.string(forKey: "glassStyle") ?? "regular"
-        apiKey = Keychain.read("apiKey")
+        speakReplies = d.bool(forKey: "speakReplies")
+        voiceID = d.string(forKey: "voiceID") ?? ""
+        recentModels = d.stringArray(forKey: "recentModels") ?? []
+        for p in Settings.providers { keys[p] = Keychain.read("key." + p) }
+        // migrate the single key from older versions
+        let legacy = Keychain.read("apiKey")
+        if !legacy.isEmpty, (keys[provider] ?? "").isEmpty { setKey(legacy, for: provider); Keychain.write("apiKey", "") }
+    }
+
+    func key(for p: String) -> String { keys[p] ?? "" }
+    func setKey(_ v: String, for p: String) { keys[p] = v; Keychain.write("key." + p, v) }
+    var apiKey: String { key(for: provider) }
+    func hasKey(_ p: String) -> Bool { !key(for: p).isEmpty }
+    var keyedProviders: [String] { Settings.providers.filter(hasKey) }
+
+    func rememberModel(_ m: String) {
+        let tag = provider + "|" + m
+        recentModels = [tag] + recentModels.filter { $0 != tag }.prefix(7)
     }
 
     var tintColor: Color { Color(hex: tintHex) ?? Color(hex: Settings.defaultTint)! }
-
     var providerLabel: String { Settings.label(provider) }
 
     static func label(_ p: String) -> String {
@@ -75,6 +93,7 @@ final class Settings: ObservableObject {
         case "anthropic": return "Claude"
         case "gemini": return "Gemini"
         case "groq": return "Groq"
+        case "openai": return "OpenAI"
         default: return "Assistant"
         }
     }
