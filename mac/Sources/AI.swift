@@ -17,8 +17,53 @@ enum AI {
     static let geminiBase = "https://generativelanguage.googleapis.com/v1beta/openai"
     static let groqBase = "https://api.groq.com/openai/v1"
     static let geminiDefault = "gemini-4-hydrogen"
+    static let anthropicDefault = "claude-sonnet-5-5"
+    static let claudeModels = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1"]
 
-    // Streams text deltas for any provider.
+    // MARK: message building (images, PDFs, text files)
+
+    private static func textWithFiles(_ m: ChatMessage) -> String {
+        var s = ""
+        for a in m.attachments where a.kind == "text" { s += "File: \(a.name)\n```\n\(a.text)\n```\n\n" }
+        return s + m.content
+    }
+
+    private static func anthropicContent(_ m: ChatMessage) -> Any {
+        guard !m.attachments.isEmpty else { return m.content }
+        var blocks: [[String: Any]] = []
+        for a in m.attachments {
+            if a.kind == "image" {
+                blocks.append(["type": "image", "source": ["type": "base64", "media_type": a.mediaType, "data": a.data]])
+            } else if a.kind == "pdf" {
+                blocks.append(["type": "document", "source": ["type": "base64", "media_type": "application/pdf", "data": a.data]])
+            }
+        }
+        let t = textWithFiles(m).trimmingCharacters(in: .whitespacesAndNewlines)
+        blocks.append(["type": "text", "text": t.isEmpty ? "(see attachment)" : t])
+        return blocks
+    }
+
+    private static func openAIContent(_ m: ChatMessage, provider: String) -> Any {
+        guard !m.attachments.isEmpty else { return m.content }
+        var parts: [[String: Any]] = []
+        var text = textWithFiles(m)
+        for a in m.attachments where a.kind == "pdf" {
+            if provider == "openai" {
+                parts.append(["type": "file", "file": ["filename": a.name, "file_data": "data:application/pdf;base64," + a.data]])
+            } else {
+                text = "[A PDF named \(a.name) was attached, but this provider can't read PDFs directly.]\n\n" + text
+            }
+        }
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        parts.append(["type": "text", "text": t.isEmpty ? "(see attachment)" : t])
+        for a in m.attachments where a.kind == "image" {
+            parts.append(["type": "image_url", "image_url": ["url": "data:\(a.mediaType);base64,\(a.data)"]])
+        }
+        return parts
+    }
+
+    // MARK: streaming
+
     static func stream(_ r: AIRequest, history: [ChatMessage]) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
@@ -27,14 +72,16 @@ enum AI {
                     let anthropic = r.provider == "anthropic"
                     var msgs: [[String: Any]] = []
                     if !anthropic && !r.system.isEmpty { msgs.append(["role": "system", "content": r.system]) }
-                    for m in history where !m.content.isEmpty { msgs.append(["role": m.role, "content": m.content]) }
+                    for m in history where !(m.role == "assistant" && m.content.isEmpty) {
+                        msgs.append(["role": m.role, "content": anthropic ? anthropicContent(m) : openAIContent(m, provider: r.provider)])
+                    }
 
                     var req: URLRequest
                     if anthropic {
                         req = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!)
                         req.setValue(r.key, forHTTPHeaderField: "x-api-key")
                         req.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-                        var body: [String: Any] = ["model": r.model, "max_tokens": 4096, "stream": true, "messages": msgs]
+                        var body: [String: Any] = ["model": r.model, "max_tokens": 8192, "stream": true, "messages": msgs]
                         if !r.system.isEmpty { body["system"] = r.system }
                         req.httpBody = try JSONSerialization.data(withJSONObject: body)
                     } else {
@@ -79,7 +126,24 @@ enum AI {
         }
     }
 
-    // Every Gemini chat model on this key, straight from Google.
+    /// One-shot call (used for smart chat titles).
+    static func quick(_ r: AIRequest, prompt: String) async throws -> String {
+        var out = ""
+        var q = r; q.system = ""
+        for try await d in stream(q, history: [ChatMessage(role: "user", content: prompt)]) { out += d }
+        return out
+    }
+
+    // MARK: model lists
+
+    static func models(provider: String, key: String) async throws -> [(id: String, name: String)] {
+        switch provider {
+        case "gemini": return try await geminiModels(key: key)
+        case "groq": return try await groqModels(key: key)
+        default: return []
+        }
+    }
+
     static func geminiModels(key: String) async throws -> [(id: String, name: String)] {
         var out: [(String, String)] = []
         var token: String? = nil
@@ -103,7 +167,6 @@ enum AI {
         return out.sorted { $0.0 > $1.0 }.map { (id: $0.0, name: $0.1) }
     }
 
-    // Every chat model on this Groq account (skips speech / TTS / guard models).
     static func groqModels(key: String) async throws -> [(id: String, name: String)] {
         var req = URLRequest(url: URL(string: groqBase + "/models")!)
         req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")

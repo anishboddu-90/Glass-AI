@@ -45,7 +45,7 @@ namespace GlassSidebar
 
                 if (atEdge && !wasAtEdge && now - lastFire > 700 && !ButtonsDown())
                 {
-                    // Look back ~90 ms: how far did the cursor travel toward this edge?
+                    // look back ~90 ms: how far did the cursor travel toward this edge?
                     int oldX = p.X; long oldT = now;
                     for (int i = 1; i < count; i++)
                     {
@@ -57,7 +57,7 @@ namespace GlassSidebar
                     double travel = (p.X - oldX) * side;          // positive = toward edge
                     double speed = travel / dt;                   // px/s
                     double w = bounds.Width;
-                    double[] speedK = { 2.4, 1.6, 1.05 };           // screen-widths per second
+                    double[] speedK = { 2.4, 1.6, 1.05 };         // screen-widths per second
                     double[] travelK = { 0.16, 0.10, 0.06 };
                     int s = Math.Max(0, Math.Min(2, Sensitivity));
                     if (speed > w * speedK[s] && travel > w * travelK[s])

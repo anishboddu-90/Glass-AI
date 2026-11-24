@@ -1,261 +1,291 @@
 import AppKit
+import AVFoundation
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
+    @EnvironmentObject var pc: PanelController
     @EnvironmentObject var s: Settings
-    @EnvironmentObject var app: AppState
-
+    @State private var keyText = ""
     @State private var keyStatus = ""
-    @State private var models: [(id: String, name: String)] = []
-    @State private var modelsStatus = ""
-    @State private var modelsFor = ""
-    @State private var hexDraft = ""
+    @State private var models: [String: [(id: String, name: String)]] = [:]
+    @State private var loadingModels = false
+    @State private var modelError = ""
 
-    private let swatches: [(String, String)] = [
-        ("Semi-gray", "#5C5E64"), ("Graphite", "#1E2026"), ("Smoke", "#8C8E94"),
-        ("Midnight", "#162246"), ("Ocean", "#124E76"), ("Violet", "#482C7C"),
-        ("Rose", "#842C52"), ("Forest", "#1C523C"), ("Amber", "#805216"),
-    ]
+    static let tints: [(String, String)] = [("Graphite", "#5C5E64"), ("Clear", "#FFFFFF"), ("Midnight", "#1C2440"), ("Ocean", "#2A6FB0"),
+                                           ("Mint", "#3BB59A"), ("Violet", "#7A5CFF"), ("Rose", "#E0607E"), ("Amber", "#D99A3A")]
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("Settings").font(.system(size: 22, weight: .semibold))
-                    Spacer()
-                    Pill("Done") { app.showSettings = false; app.focusTick += 1 }
-                }
-                .padding(.bottom, 4)
-
-                glassCard
-                providerCard
-                behaviorCard
-
-                Text("Changes apply instantly. Your API key is stored in the macOS Keychain. ⌃⌥Space toggles the sidebar; ⌘N starts a new chat.")
-                    .font(.system(size: 11)).foregroundStyle(.white.opacity(0.5)).padding(.horizontal, 4)
+            VStack(alignment: .leading, spacing: 14) {
+                card("API key", icon: "key.fill", delay: 0) { keyCard }
+                card("Model", icon: "sparkles", delay: 0.04) { modelCard }
+                card("Glass", icon: "drop.fill", delay: 0.08) { glassCard }
+                card("Voice", icon: "waveform", delay: 0.12) { voiceCard }
+                card("Edge flick", icon: "cursorarrow.motionlines", delay: 0.16) { flickCard }
+                card("Instructions", icon: "text.quote", delay: 0.2) { promptCard }
+                Text("Glass · ⌃⌥Space toggles from anywhere · Esc closes")
+                    .font(.system(size: 10.5)).foregroundStyle(UI.faint).frame(maxWidth: .infinity).appear(0.26)
             }
             .padding(16)
-            .frame(maxWidth: app.fullscreen ? 620 : .infinity)
+            .frame(maxWidth: pc.full ? 640 : .infinity)
             .frame(maxWidth: .infinity)
         }
-        .onAppear {
-            hexDraft = s.tintHex
-            keyStatus = s.apiKey.isEmpty ? "No key saved yet." : "Key saved in Keychain."
-            loadModelsIfNeeded()
-        }
+        .onAppear { keyText = ""; refreshStatus(); loadModels() }
+        .onChange(of: s.provider) { _, _ in keyText = ""; refreshStatus(); loadModels() }
     }
 
-    // MARK: cards
-
-    private var glassCard: some View {
-        Card(title: "Glass") {
-            label("Style")
-            Picker("", selection: $s.glassStyle) {
-                Text("Clear").tag("clear")
-                Text("Regular").tag("regular")
-                Text("Frosted").tag("frosted")
-            }
-            .pickerStyle(.segmented).labelsHidden()
-
-            label("Tint")
-            FlowLayout(spacing: 6) {
-                ForEach(swatches, id: \.1) { sw in
-                    let selected = s.tintHex.uppercased() == sw.1
-                    Button { s.tintHex = sw.1; hexDraft = sw.1 } label: {
-                        Circle().fill(Color(hex: sw.1)!)
-                            .frame(width: 28, height: 28)
-                            .overlay(Circle().strokeBorder(.white.opacity(0.35)))
-                            .padding(3)
-                            .overlay(Circle().strokeBorder(.white, lineWidth: selected ? 2 : 0))
-                    }
-                    .buttonStyle(PressStyle()).help(sw.0)
-                }
-            }
-            HStack(spacing: 8) {
-                Circle().fill(s.tintColor).frame(width: 14, height: 14).overlay(Circle().strokeBorder(.white.opacity(0.5)))
-                TextField("#5C5E64", text: $hexDraft)
-                    .textFieldStyle(.plain).font(.system(size: 12.5, design: .monospaced)).frame(width: 80)
-                    .onSubmit { if Color(hex: hexDraft) != nil { s.tintHex = "#" + hexDraft.replacingOccurrences(of: "#", with: "").uppercased() } else { hexDraft = s.tintHex } }
-                Text("Custom hex — press Return").font(.system(size: 11)).foregroundStyle(.white.opacity(0.5))
-            }
-            .padding(.horizontal, 10).padding(.vertical, 7)
-            .background(field)
-            .padding(.top, 4)
-
-            HStack {
-                label("Tint strength")
-                Spacer()
-                Text("\(Int((s.tintStrength / 0.85 * 100).rounded()))%").font(.system(size: 11.5)).foregroundStyle(.white.opacity(0.8)).padding(.top, 10)
-            }
-            Slider(value: $s.tintStrength, in: 0...0.85).tint(.white)
-
-            Pill("Reset to semi-gray") {
-                s.tintHex = Settings.defaultTint; hexDraft = Settings.defaultTint
-                s.tintStrength = Settings.defaultStrength; s.glassStyle = "regular"
-            }
-            .padding(.top, 8)
+    private func card<C: View>(_ title: String, icon: String, delay: Double, @ViewBuilder _ c: () -> C) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(title, systemImage: icon).font(.system(size: 12, weight: .semibold)).foregroundStyle(UI.dim)
+            c()
         }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .chip(16)
+        .appear(delay, y: 16)
     }
 
-    private var providerCard: some View {
-        Card(title: "AI provider") {
-            label("API key")
-            SecureField("Paste your key", text: $s.apiKey)
-                .textFieldStyle(.plain).font(.system(size: 13.5))
-                .padding(.horizontal, 12).padding(.vertical, 9).background(field)
-                .onChange(of: s.apiKey) { k in
-                    if let p = Settings.providerFor(key: k), p != s.provider { setProvider(p) }
-                }
+    // MARK: key
+
+    private var keyCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
-                Pill("Import from file…") { importKey() }
-                Pill("Paste") {
-                    if let t = NSPasteboard.general.string(forType: .string), let k = Settings.extractKey(t) { accept(k, "Pasted from clipboard.") }
-                    else { keyStatus = "Clipboard doesn't contain an API key." }
-                }
-                Pill("Remove") { s.apiKey = ""; keyStatus = "Key removed." }
-            }
-            .padding(.top, 8)
-            Text(keyStatus).font(.system(size: 11.5)).foregroundStyle(.white.opacity(0.7)).padding(.top, 6)
-
-            label("Provider")
-            FlowLayout(spacing: 6) {
-                Pill("Anthropic (Claude)", selected: s.provider == "anthropic") { setProvider("anthropic") }
-                Pill("Google Gemini", selected: s.provider == "gemini") { setProvider("gemini") }
-                Pill("Groq", selected: s.provider == "groq") { setProvider("groq") }
-                Pill("OpenAI-compatible", selected: s.provider == "openai") { setProvider("openai") }
-            }
-
-            if s.provider == "gemini" || s.provider == "groq" {
-                HStack {
-                    label(s.provider == "gemini" ? "Gemini models" : "Groq models")
-                    Spacer()
-                    Pill("Refresh") { modelsFor = ""; loadModelsIfNeeded() }.padding(.top, 8)
-                }
-                if !modelsStatus.isEmpty {
-                    Text(modelsStatus).font(.system(size: 11.5)).foregroundStyle(.white.opacity(0.65)).padding(.bottom, 4)
-                }
-                FlowLayout(spacing: 6) {
-                    ForEach(models, id: \.id) { m in
-                        Pill(m.name, selected: s.model == m.id) { s.model = m.id }.help(m.id)
+                ForEach(Settings.providers, id: \.self) { p in
+                    PillButton(title: Settings.label(p), symbol: s.hasKey(p) ? "checkmark.circle.fill" : nil, selected: s.provider == p) {
+                        withAnimation(UI.spring) { switchProvider(p) }
                     }
                 }
             }
-
-            label("Model")
-            TextField("Model name", text: $s.model)
-                .textFieldStyle(.plain).font(.system(size: 13.5))
-                .padding(.horizontal, 12).padding(.vertical, 9).background(field)
-
-            if s.provider == "openai" {
-                label("Base URL (OpenAI, OpenRouter, local…)")
-                TextField("https://api.openai.com/v1", text: $s.baseURL)
-                    .textFieldStyle(.plain).font(.system(size: 13.5))
-                    .padding(.horizontal, 12).padding(.vertical, 9).background(field)
+            HStack(spacing: 6) {
+                SecureField("", text: $keyText, prompt: Text(s.hasKey(s.provider) ? "•••••••• saved in Keychain" : placeholder).foregroundColor(UI.faint))
+                    .textFieldStyle(.plain).font(.system(size: 13, design: .monospaced))
+                    .padding(.horizontal, 10).frame(height: 32).chip(10)
+                    .onSubmit { accept(keyText) }
+                IconButton(symbol: "doc.on.clipboard", help: "Paste key", size: 30) { accept(NSPasteboard.general.string(forType: .string) ?? "") }
+                IconButton(symbol: "folder", help: "Import from a .txt / .env / .json file", size: 30) { importFile() }
+                if s.hasKey(s.provider) {
+                    IconButton(symbol: "trash", help: "Remove key", size: 30) { s.setKey("", for: s.provider); refreshStatus() }
+                }
             }
+            if !keyText.isEmpty {
+                PillButton(title: "Save key", symbol: "lock.fill", selected: true) { accept(keyText) }.transition(.scale.combined(with: .opacity))
+            }
+            Text(keyStatus).font(.system(size: 11)).foregroundStyle(UI.faint).id(keyStatus).transition(.opacity)
+        }
+        .animation(UI.spring, value: keyText.isEmpty)
+    }
+
+    private var placeholder: String {
+        switch s.provider {
+        case "anthropic": return "sk-ant-…"
+        case "gemini": return "AIza…"
+        case "groq": return "gsk_…"
+        default: return "sk-…"
         }
     }
 
-    private var behaviorCard: some View {
-        Card(title: "Behavior") {
-            label("Swipe sensitivity")
-            Picker("", selection: $s.sensitivity) {
-                Text("Hard flick").tag(0)
-                Text("Normal").tag(1)
-                Text("Light").tag(2)
-            }
-            .pickerStyle(.segmented).labelsHidden()
-
-            label("System prompt")
-            TextEditor(text: $s.systemPrompt)
-                .font(.system(size: 13))
-                .scrollContentBackground(.hidden)
-                .frame(minHeight: 70, maxHeight: 140)
-                .padding(8).background(field)
-        }
+    private func refreshStatus() {
+        let where_ = s.provider == "anthropic" ? "console.anthropic.com" : s.provider == "gemini" ? "aistudio.google.com" :
+                     s.provider == "groq" ? "console.groq.com" : "your provider's dashboard"
+        keyStatus = s.hasKey(s.provider) ? "Stored securely in your macOS Keychain." : "Get a key at \(where_). Keys never leave this Mac except to call the API."
     }
 
-    // MARK: helpers
-
-    private var field: some View {
-        RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.white.opacity(0.1))
-            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.white.opacity(0.16)))
-    }
-
-    private func label(_ t: String) -> some View {
-        Text(t).font(.system(size: 11.5)).foregroundStyle(.white.opacity(0.65)).padding(.top, 12).padding(.leading, 2)
-    }
-
-    private func setProvider(_ p: String) {
+    private func switchProvider(_ p: String) {
         guard p != s.provider else { return }
         s.provider = p
         switch p {
-        case "anthropic": s.model = "claude-sonnet-5-5"
-        case "gemini": s.model = AI.geminiDefault
-        default: s.model = ""
+        case "anthropic": if !AI.claudeModels.contains(s.model) { s.model = AI.anthropicDefault }
+        case "gemini": if !s.model.hasPrefix("gemini") { s.model = AI.geminiDefault }
+        case "groq": s.model = "llama-3.3-70b-versatile"
+        default: s.model = "gpt-4.1"
         }
-        models = []; modelsFor = ""
-        loadModelsIfNeeded()
     }
 
-    private func accept(_ k: String, _ how: String) {
-        s.apiKey = k
-        if let p = Settings.providerFor(key: k) { setProvider(p) }
-        keyStatus = how + " Looks like a \(s.providerLabel == "Assistant" ? "OpenAI-compatible" : s.providerLabel) key — saved."
-        modelsFor = ""; loadModelsIfNeeded()
+    private func accept(_ raw: String) {
+        guard let k = Settings.extractKey(raw) else { keyStatus = "That doesn't look like an API key."; return }
+        if let p = Settings.providerFor(key: k), p != s.provider { switchProvider(p) }
+        s.setKey(k, for: s.provider)
+        keyText = ""
+        withAnimation(UI.soft) { keyStatus = "Saved \(Settings.label(s.provider)) key to Keychain ✓" }
+        pc.show(toast: "\(Settings.label(s.provider)) is ready")
+        loadModels()
     }
 
-    private func loadModelsIfNeeded() {
+    private func importFile() {
+        pc.holdOpen = true
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.plainText, .json, .data]
+        panel.level = .modalPanel
+        NSApp.activate(ignoringOtherApps: true)
+        panel.begin { r in
+            MainActor.assumeIsolated {
+                pc.holdOpen = false
+                guard r == .OK, let u = panel.url, let t = try? String(contentsOf: u, encoding: .utf8) else { return }
+                accept(t)
+            }
+        }
+    }
+
+    // MARK: model
+
+    private var modelCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            let list: [(id: String, name: String)] = s.provider == "anthropic" ? AI.claudeModels.map { (id: $0, name: $0) } : (models[s.provider] ?? [])
+            if !list.isEmpty {
+                ScrollView {
+                    VStack(spacing: 1) {
+                        ForEach(list, id: \.id) { m in
+                            HoverRow(selected: s.model == m.id, action: { s.model = m.id; s.rememberModel(m.id) }) { _ in
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(m.name).font(.system(size: 12.5)).lineLimit(1)
+                                        if m.name != m.id { Text(m.id).font(.system(size: 10.5)).foregroundStyle(UI.faint).lineLimit(1) }
+                                    }
+                                    Spacer()
+                                    if s.model == m.id { Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(UI.accent) }
+                                }
+                            }
+                        }
+                    }
+                }
+                .frame(maxHeight: 200)
+            }
+            if loadingModels { HStack { ProgressView().controlSize(.small); Text("Loading models…").font(.system(size: 11)).foregroundStyle(UI.faint) } }
+            if !modelError.isEmpty { Text(modelError).font(.system(size: 11)).foregroundStyle(Color(hex: "#FFB4A8")!) }
+            TextField("", text: $s.model, prompt: Text("Model ID").foregroundColor(UI.faint))
+                .textFieldStyle(.plain).font(.system(size: 12.5, design: .monospaced))
+                .padding(.horizontal, 10).frame(height: 30).chip(10)
+            if s.provider == "openai" {
+                TextField("", text: $s.baseURL, prompt: Text("Base URL (OpenAI, OpenRouter, Ollama, LM Studio…)").foregroundColor(UI.faint))
+                    .textFieldStyle(.plain).font(.system(size: 12.5, design: .monospaced))
+                    .padding(.horizontal, 10).frame(height: 30).chip(10)
+            }
+        }
+    }
+
+    private func loadModels() {
         let p = s.provider
-        guard p == "gemini" || p == "groq", modelsFor != p else { return }
-        guard !s.apiKey.isEmpty else { modelsStatus = "Add your key above, then hit Refresh to load every model."; return }
-        modelsFor = p
-        modelsStatus = "Loading models…"
-        let key = s.apiKey
+        guard p == "gemini" || p == "groq", s.hasKey(p) else { modelError = ""; return }
+        loadingModels = true; modelError = ""
+        let key = s.key(for: p)
         Task {
             do {
-                let list = p == "gemini" ? try await AI.geminiModels(key: key) : try await AI.groqModels(key: key)
-                guard s.provider == p else { return }
-                models = list
-                modelsStatus = "\(list.count) models available. Tap one to use it."
-                if !list.contains(where: { $0.id == s.model }), (p == "groq" || s.model.isEmpty), let first = list.first { s.model = first.id }
+                let r = try await AI.models(provider: p, key: key)
+                withAnimation(UI.soft) { models[p] = r }
             } catch {
-                modelsStatus = error.localizedDescription
-                modelsFor = ""
+                modelError = error.localizedDescription
             }
+            loadingModels = false
         }
     }
 
-    private func importKey() {
-        let pc = PanelController.shared
-        pc.suppressAutoHide = true
-        defer { pc.suppressAutoHide = false }
-        let open = NSOpenPanel()
-        open.title = "Import API key"
-        open.allowsMultipleSelection = false
-        open.canChooseDirectories = false
-        open.level = .modalPanel
-        NSApp.activate(ignoringOtherApps: true)
-        if open.runModal() == .OK, let url = open.url {
-            if let text = try? String(contentsOf: url, encoding: .utf8), let k = Settings.extractKey(text) {
-                accept(k, "Imported from \(url.lastPathComponent).")
-            } else {
-                keyStatus = "Couldn't find an API key in that file."
+    // MARK: glass
+
+    private var glassCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                ForEach(SettingsView.tints, id: \.1) { name, hex in
+                    Swatch(hex: hex, selected: s.tintHex.uppercased() == hex.uppercased()) { withAnimation(UI.spring) { s.tintHex = hex } }
+                        .help(name)
+                }
+                ColorPicker("", selection: Binding(get: { s.tintColor }, set: { s.tintHex = $0.hex }), supportsOpacity: false)
+                    .labelsHidden().frame(width: 26)
             }
+            slider("Tint", value: $s.tintStrength, range: 0...0.85, text: "\(Int(s.tintStrength * 100))%")
+            HStack(spacing: 6) {
+                Text("Style").font(.system(size: 12)).foregroundStyle(UI.dim).frame(width: 60, alignment: .leading)
+                ForEach([("clear", "Clear"), ("regular", "Liquid"), ("frosted", "Frosted")], id: \.0) { id, name in
+                    PillButton(title: name, selected: s.glassStyle == id) { withAnimation(UI.spring) { s.glassStyle = id } }
+                }
+            }
+            Button("Reset to semi-gray") {
+                withAnimation(UI.spring) { s.tintHex = Settings.defaultTint; s.tintStrength = Settings.defaultStrength; s.glassStyle = "regular" }
+            }
+            .buttonStyle(.plain).font(.system(size: 11.5, weight: .medium)).foregroundStyle(UI.dim)
         }
+    }
+
+    private func slider(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, text: String) -> some View {
+        HStack(spacing: 10) {
+            Text(title).font(.system(size: 12)).foregroundStyle(UI.dim).frame(width: 60, alignment: .leading)
+            Slider(value: value, in: range).controlSize(.small).tint(.white)
+            Text(text).font(.system(size: 11, design: .monospaced)).foregroundStyle(UI.faint).frame(width: 40, alignment: .trailing)
+        }
+    }
+
+    // MARK: voice
+
+    private var voiceCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Toggle(isOn: $s.speakReplies) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Read replies aloud").font(.system(size: 12.5))
+                    Text("Voice mode (⌘⇧V) always talks back").font(.system(size: 10.5)).foregroundStyle(UI.faint)
+                }
+            }
+            .toggleStyle(.switch).controlSize(.small)
+            HStack {
+                Text("Voice").font(.system(size: 12)).foregroundStyle(UI.dim).frame(width: 60, alignment: .leading)
+                Picker("", selection: $s.voiceID) {
+                    Text("System default").tag("")
+                    ForEach(Voice.voices, id: \.identifier) { v in
+                        Text("\(v.name)\(v.quality == .premium ? " (Premium)" : v.quality == .enhanced ? " (Enhanced)" : "")").tag(v.identifier)
+                    }
+                }
+                .labelsHidden()
+                IconButton(symbol: "play.fill", help: "Preview", size: 26) { Voice.shared.speak("Hi, I'm Glass. This is how I sound.") }
+            }
+            Text("Dictation runs on-device when your Mac supports it. Download better voices in System Settings → Accessibility → Spoken Content.")
+                .font(.system(size: 10.5)).foregroundStyle(UI.faint).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    // MARK: flick
+
+    private var flickCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                ForEach([(0, "Firm"), (1, "Normal"), (2, "Light")], id: \.0) { k, name in
+                    PillButton(title: name, selected: s.sensitivity == k) { withAnimation(UI.spring) { s.sensitivity = k } }
+                }
+            }
+            Text("Flick your cursor fast into the left or right edge of any screen to open Glass on that side.")
+                .font(.system(size: 10.5)).foregroundStyle(UI.faint).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var promptCard: some View {
+        TextEditor(text: $s.systemPrompt)
+            .font(.system(size: 12.5))
+            .scrollContentBackground(.hidden)
+            .frame(height: 90)
+            .padding(6).chip(10)
     }
 }
 
-struct Card<Content: View>: View {
-    var title: String
-    @ViewBuilder var content: () -> Content
+struct Swatch: View {
+    var hex: String
+    var selected: Bool
+    var action: () -> Void
+    @State private var hover = false
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(title).font(.system(size: 14, weight: .semibold))
-            content()
+        Button(action: action) {
+            Circle().fill(Color(hex: hex)!)
+                .frame(width: 22, height: 22)
+                .overlay(Circle().strokeBorder(Color.white.opacity(selected ? 0.95 : 0.3), lineWidth: selected ? 2 : 1))
+                .padding(2)
+                .overlay(Circle().strokeBorder(Color.white.opacity(selected ? 0.35 : 0), lineWidth: 1))
+                .scaleEffect(selected ? 1.12 : hover ? 1.08 : 1)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(.white.opacity(0.07)))
-        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(.white.opacity(0.13)))
+        .buttonStyle(.plain)
+        .onHover { h in withAnimation(UI.snappy) { hover = h } }
+    }
+}
+
+extension Color {
+    var hex: String {
+        let c = NSColor(self).usingColorSpace(.sRGB) ?? .gray
+        return String(format: "#%02X%02X%02X", Int(c.redComponent * 255), Int(c.greenComponent * 255), Int(c.blueComponent * 255))
     }
 }

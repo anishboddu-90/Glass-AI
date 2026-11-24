@@ -1,206 +1,144 @@
-# Glass — a liquid-glass AI sidebar for Windows
+# Glass
 
-Flick your mouse hard into the left or right edge of the screen and a sidebar made of real-time refracting glass springs out. Chat with Claude, Gemini, Groq, or any OpenAI-compatible model, and go fullscreen when you want more room.
-
----
-
-## Features
-
-- **Flick to open.** Fling the cursor into the left or right edge of the screen and the sidebar slides out on that side with a springy, liquid motion. Flick the same edge again to close it.
-- **Real-time liquid glass.** Every frame, the app captures what's behind the panel and bends it through a curved glass edge. You get a light rainbow split at the rim, a specular highlight, an inner shadow, a gloss toward the top and a soft drop shadow. It's live, so videos and moving windows behind it refract as they play.
-- **Tint and blur you can change.** Semi-gray by default. Pick from 9 swatches or type any hex color, and adjust tint strength and blur (0–24 px). Changes show up immediately.
-- **A full chat app:**
-  - replies stream in as they're written, with formatting (headings, lists, code blocks, bold, italics, inline code, links)
-  - a typing indicator, Copy and Retry on replies, and a Stop button while it's answering
-  - suggestion chips on the welcome screen
-- **Fullscreen mode.** One button grows the glass to fill the monitor and adds a **chats sidebar** where you can start a new chat, search, switch between chats and delete them.
-- **Saved chats.** Every conversation is saved automatically and titled from your first message.
-- **Several providers:**
-  | Provider | Key looks like | Models |
-  |---|---|---|
-  | Anthropic (Claude) | `sk-ant-…` | You type the model (default `claude-sonnet-5-5`) |
-  | Google Gemini | `AIza…` | Loaded live from your account |
-  | Groq | `gsk_…` | Loaded live from your account |
-  | OpenAI-compatible | `sk-…` / other | You type the model and base URL (OpenAI, OpenRouter, a local server, …) |
-- **Easy key import.** Paste a key, or import it from a `.txt`, `.env`, `.json` or `.key` file. The app finds the key and picks the matching provider.
-- **Key stays private.** Your key is encrypted with Windows (DPAPI) and stored only on your PC.
-
----
-
-## Requirements
-
-- Windows 10 version 2004 or later, or Windows 11. Live refraction relies on a Windows feature that hides the app's own window from screen capture. On older Windows the panel falls back to a solid tinted background.
-- .NET Framework 4.x, which is built into Windows. Nothing to install.
-
----
-
-## Build and run
-
-1. Put the `GlassSidebar` folder somewhere easy, like your Desktop.
-2. Double-click **`build.bat`**.
-3. It closes any copy that's already running, compiles **`GlassSidebar.exe`**, and launches it.
-
-The build uses the C# compiler that ships with Windows (`csc.exe` from .NET Framework). There's no Visual Studio or SDK to install.
-
-If the build fails, the window stays open and shows the errors.
-
----
-
-## First-time setup
-
-1. Open the sidebar: flick to a screen edge, press **Ctrl+Alt+Space**, or click the tray orb.
-2. Click the **gear** icon (or the model chip in the text box).
-3. Under **AI provider**, paste your key, or click **Import from file…**.
-4. Pick a model. For Gemini and Groq, tap one from the list.
-5. Click **Save changes**.
-
----
-
-## Controls
-
-| Action | How |
-|---|---|
-| Open / close sidebar | Flick the cursor hard into the left or right screen edge |
-| Toggle sidebar | **Ctrl+Alt+Space** |
-| Send | **Enter** |
-| New line | **Shift+Enter** |
-| Stop a reply | Click the send button while it's answering |
-| New chat | **Ctrl+N**, or the new-chat icon |
-| Fullscreen | Fullscreen icon in the header |
-| Close / back | **Esc** (leaves settings first, then fullscreen, then closes) |
-| Keep it open when clicking elsewhere | Pin icon |
-| Quit | Right-click the tray orb → **Quit** |
-
----
-
-## Settings
-
-**Glass**
-- **Tint:** Semi-gray (default), Graphite, Smoke, Midnight, Ocean, Violet, Rose, Forest, Amber, or a custom hex color.
-- **Tint strength:** from clear to nearly solid. Over bright backgrounds the tint gets a little deeper on its own, so white text stays readable.
-- **Blur:** Off to 24 px (default 9).
-- **Reset to semi-gray:** restores the defaults.
-
-**AI provider:** API key, provider, model, and base URL for OpenAI-compatible services.
-
-**Behavior**
-- **Swipe sensitivity:** *Hard flick*, *Normal* or *Light*. Use this if the sidebar opens by accident or won't open.
-- **System prompt:** instructions sent with every chat.
-
----
-
-## Where your data lives
-
-| What | Location |
-|---|---|
-| Settings and encrypted API key | `%APPDATA%\GlassSidebar\settings.json` |
-| Saved chats (one JSON file each) | `%APPDATA%\GlassSidebar\chats\` |
-
-To reset everything, quit the app and delete the `%APPDATA%\GlassSidebar` folder.
-
----
-
-## Start with Windows
-
-Press **Win+R**, type `shell:startup` and press Enter, then put a shortcut to `GlassSidebar.exe` in the folder that opens.
-
----
-
-## Troubleshooting
-
-- **"Could not write to output file … being used by another process" while building:** the app is still running. The current `build.bat` closes it for you. If it doesn't, quit it from the tray first.
-- **The flick doesn't open it:** set Swipe sensitivity to *Light*. Don't hold a mouse button while flicking, since that counts as dragging. Touchpad multi-finger swipes don't work because Windows keeps those gestures for itself, so move the pointer itself.
-- **It opens by accident:** set Swipe sensitivity to *Hard flick*.
-- **The panel is a solid color with no refraction:** your Windows version is older than 10 (2004).
-- **Text is hard to read over a bright background:** raise Tint strength, or pick a darker tint such as Graphite.
-- **Feels slow in fullscreen:** lower the blur. Fullscreen already draws the glass at half resolution to keep it smooth.
-- **API errors:** the error shows under the reply. Check the key, the provider and the model name in Settings.
-
----
-
-## Project layout
+A liquid-glass AI sidebar for Windows, macOS and Linux. Flick your cursor fast into the left or right edge of the screen and Glass slides out. Ask anything, drop in files, screenshot what you're looking at, or just talk to it.
 
 ```
 GlassSidebar/
-├─ build.bat                      one-click build + launch
-├─ README.md
-└─ src/
-   ├─ Program.cs                  entry point, tray icon, single instance
-   ├─ SwipeDetector.cs            ~250 Hz cursor watcher for edge flicks
-   ├─ Native.cs                   Windows API calls (screen capture, hotkey, DPI)
-   ├─ Glass.cs                    capture buffer, blur, refraction shader (multi-core)
-   ├─ SidebarWindow.cs            window, spring animations, per-frame render loop
-   ├─ SidebarWindow.Chat.cs       settings screen + provider/model picker
-   ├─ SidebarWindow.Messages.cs   conversation UI, streaming, copy/retry
-   ├─ SidebarWindow.ChatList.cs   saved-chats pane (fullscreen)
-   ├─ SidebarWindow.Appearance.cs tint swatches, sliders
-   ├─ Chats.cs                    saving and loading chats
-   ├─ Markdown.cs                 Markdown → rich text for replies
-   ├─ Ai.cs                       settings, API key handling, streaming clients
-   └─ ui.xaml                     layout and styles
+├─ windows/   C# / WPF  → GlassSidebar.exe   (live refraction glass)
+├─ mac/       Swift / SwiftUI → Glass.app    (Apple Liquid Glass on macOS 26)
+└─ linux/     Python / Qt6 → `glass`         (X11 + XWayland)
 ```
 
-### How the glass works
+## Features
 
-1. The app's window is excluded from screen capture (`WDA_EXCLUDEFROMCAPTURE`), so each frame it can copy the pixels *behind* itself with GDI.
-2. It applies the blur you chose to that capture (a fast box blur, run twice).
-3. A per-pixel pass treats the panel as a rounded rectangle with a curved bezel. Near the edge, it samples outward along the edge's normal, so content from beyond the rim is pulled in. It samples red, green and blue at slightly different offsets for the rainbow split, then adds the tint, a rim highlight, the inner shadow and the top gloss.
-4. The result goes into a bitmap under the chat UI. The work is spread across CPU cores, and large surfaces are drawn at half resolution.
+| | Windows | macOS | Linux |
+|---|---|---|---|
+| Flick-to-open from either screen edge | ✅ | ✅ | ✅ X11 / XWayland |
+| Glass | Live refraction (custom renderer) | System Liquid Glass (macOS 26), vibrancy on 14–15 | Snapshot refraction + KDE blur |
+| Tint (default semi-gray), strength, blur/style | ✅ | ✅ | ✅ |
+| Fullscreen mode with chats sidebar | ✅ | ✅ | ✅ |
+| Saved chats, search, pin, delete, copy as Markdown, smart AI titles | ✅ | ✅ | ✅ |
+| Claude, Gemini (all models), Groq, OpenAI-compatible (OpenRouter, Ollama, LM Studio…) | ✅ | ✅ | ✅ |
+| Switch model mid-chat (⌘K / Ctrl+K) with one saved key per provider | ✅ | ✅ | ✅ |
+| Attach images, PDFs, text and code (picker, drag-and-drop, paste) | ✅ | ✅ | ✅ |
+| Ask about my screen (screenshot of what's *behind* the panel) | ✅ | ✅ | ✅ |
+| Edit and resend, regenerate, stop, copy, read aloud | ✅ | ✅ | ✅ |
+| Dictation + hands-free voice mode (listen → reply → speak → listen) | ✅ Windows Speech | ✅ on-device Speech | ✅ Whisper via Groq/OpenAI key |
+| Markdown, tables, code blocks with copy | ✅ | ✅ | ✅ |
+
+## Getting an API key
+
+| Provider | Where | Looks like |
+|---|---|---|
+| Claude | console.anthropic.com | `sk-ant-…` |
+| Gemini | aistudio.google.com | `AIza…` |
+| Groq | console.groq.com | `gsk_…` |
+| OpenAI / compatible | your provider | `sk-…` + base URL |
+
+Open **Settings**, then paste the key, or import it from a `.txt`, `.env` or `.json` file. Glass works out which provider a key belongs to from its prefix. Each provider keeps its own key, so you can switch between providers without pasting again.
+
+Keys stay on your machine:
+- **Windows:** encrypted with DPAPI.
+- **macOS:** Keychain.
+- **Linux:** the system keyring, or a `0600` file if there is no keyring.
+
+Keys are only ever sent to the provider's API.
 
 ---
 
-# macOS version
+## Windows
 
-The `mac/` folder contains a native port written in Swift and SwiftUI. It has the same features: flick to open, tinted glass, Claude, Gemini, Groq and OpenAI-compatible providers, fullscreen with a chats sidebar, saved chats, and key import.
+**Requirements:** Windows 10 2004+ or Windows 11. You don't need to install anything else, because the build uses the C# compiler that ships with .NET Framework 4.
 
-## How the glass works on Mac
+```bat
+cd windows
+build.bat
+```
 
-On **macOS 26 (Tahoe) and later** it uses Apple's own **Liquid Glass** (`glassEffect`), the same material macOS itself uses. It refracts the desktop and windows behind the panel live, tinted with your color.
+This produces `windows\GlassSidebar.exe` and starts it. Copy the EXE anywhere you like. To start it at login, put a shortcut to it in `shell:startup`.
 
-On **macOS 14–15** it falls back to a tinted behind-window blur with the same rim light and gloss, but without the refraction.
+- **Open:** flick to an edge, press **Ctrl+Alt+Space**, or use the tray icon.
+- **Crash log:** `%TEMP%\GlassSidebar.log`
+- **Data:** `%APPDATA%\GlassSidebar\` (settings and `chats\`)
 
-## Build (needs a Mac)
+**How the glass works:** Glass hides itself from screen capture (`WDA_EXCLUDEFROMCAPTURE`), so every frame it can capture what's behind the panel. It then blurs that image and refracts it through a rounded bezel, adding chromatic split, rim light and gloss. The result is real refraction of live content, not a static blur.
 
-1. Install Apple's command line tools if you don't have them: `xcode-select --install`. Real Liquid Glass needs the **Xcode 26** tools (Swift 6.2) or newer. With older tools, the app still builds and uses the blur fallback.
-2. Copy the `mac` folder to the Mac.
-3. In Terminal, run:
-   ```bash
-   cd path/to/mac
-   bash build.sh
-   ```
-4. It builds a universal **`Glass.app`** (Apple silicon and Intel), signs it for local use, and launches it. Drag it into **Applications** if you want to keep it.
+## macOS
 
-The first time you open it, macOS may say the app is from an unidentified developer. If so, right-click `Glass.app` → **Open** → **Open**.
+**Requirements:** macOS 14+ and Xcode or the Command Line Tools (`xcode-select --install`). For true Liquid Glass you need macOS 26 and a build made with Xcode 26.
 
-## Mac differences
+```bash
+cd mac
+chmod +x build.sh
+./build.sh            # builds build/Glass.app and opens it
+./build.sh install    # also copies it to /Applications
+```
 
-| | Windows | macOS |
+- **Open:** flick to an edge, press **⌃⌥Space**, or use the ✨ menu-bar icon.
+- **Permissions:** macOS asks for each one the first time you use the feature.
+  - **Microphone** and **Speech Recognition:** dictation and voice mode.
+  - **Screen Recording:** "Ask about my screen". Glass leaves its own window out of the screenshot.
+- **Data:** `~/Library/Application Support/Glass/chats`, plus `UserDefaults` and the Keychain.
+
+## Linux
+
+**Requirements:** Python 3.9+. Works on X11 and on Wayland through XWayland.
+
+```bash
+cd linux
+chmod +x install.sh
+./install.sh
+glass
+```
+
+This installs a private virtual environment with PySide6, numpy and keyring into `~/.local/share/glass-app`, the `glass` launcher into `~/.local/bin`, and a desktop entry.
+
+- **Open:** flick to an edge (X11 or XWayland), use the tray icon, or bind **`glass --toggle`** to a keyboard shortcut in your desktop settings.
+- **Wayland:** Wayland doesn't let apps place windows or read the global cursor, so Glass runs through XWayland by default. If flicks don't fire, use the shortcut.
+- **Glass effect:** Qt can't see behind its own window, so the glass is rendered from a screenshot taken each time the panel opens. KDE Plasma also gets real blur-behind.
+- **Optional extras:**
+  - Read replies aloud: `speech-dispatcher` or `espeak-ng`.
+  - Screenshots on wlroots compositors: `grim`.
+  - Voice input: transcribed with Whisper, which needs a Groq key (free tier) or an OpenAI key.
+- **Data:** `~/.config/glass`, `~/.local/share/glass/chats`
+
+---
+
+## Shortcuts
+
+Windows/Linux use **Ctrl**; macOS uses **⌘**.
+
+| | |
+|---|---|
+| Toggle Glass from anywhere | Ctrl+Alt+Space / ⌃⌥Space |
+| New chat | Ctrl+N |
+| Switch model | Ctrl+K |
+| Settings | Ctrl+, |
+| Attach files | Ctrl+O |
+| Ask about my screen | Ctrl+Shift+S |
+| Voice mode | Ctrl+Shift+V |
+| Fullscreen | F11 (Win/Linux) · ⌘F (Mac) |
+| Keep open / pin | ⌘P (Mac) · pin button |
+| Edit last message | ↑ in an empty composer |
+| New line | Shift+Enter (Win/Linux) · ⌥⏎ (Mac) |
+| Close / stop / back | Esc |
+
+## Flick sensitivity
+
+You can pick **Firm**, **Normal** or **Light** in Settings. Glass opens when the cursor reaches a screen edge fast enough, after travelling a minimum distance in the last ~90 ms:
+
+| Setting | Speed (× screen width per second) | Distance (× screen width) |
 |---|---|---|
-| Toggle shortcut | Ctrl+Alt+Space | **⌃⌥Space** (Control+Option+Space) |
-| New chat | Ctrl+N | **⌘N** |
-| New line in message | Shift+Enter | **⌥Return** |
-| Tray / menu bar | Tray orb | **✨ icon in the menu bar** |
-| Glass styles | Tint + blur slider (custom refraction) | **Clear / Regular / Frosted** + tint & strength (Apple Liquid Glass) |
-| API key storage | Windows DPAPI | **macOS Keychain** |
-| Chats folder | `%APPDATA%\GlassSidebar\chats` | `~/Library/Application Support/Glass/chats` |
+| Firm | 2.4 | 16% |
+| Normal | 1.6 | 10% |
+| Light | 1.05 | 6% |
 
-The flick detector and the hotkey don't need any special permissions (Accessibility or Screen Recording).
+Flicking the same edge again closes the panel.
 
-To start Glass at login, go to **System Settings → General → Login Items** and add `Glass.app`.
+## Troubleshooting
 
-## Mac source layout
-
-```
-mac/
-├─ build.sh              builds, packages and signs Glass.app
-└─ Sources/
-   ├─ App.swift          entry point, menu bar icon
-   ├─ Panel.swift        floating glass panel, slide/fullscreen animations, flick detector, ⌃⌥Space hotkey
-   ├─ Components.swift   Liquid Glass surface, buttons, pills, flow layout, Markdown renderer
-   ├─ Views.swift        header, welcome, messages, composer, chats sidebar
-   ├─ SettingsView.swift glass / provider / behavior settings
-   ├─ Chats.swift        conversation logic + saved chats
-   ├─ AI.swift           streaming clients + Gemini/Groq model lists
-   └─ Settings.swift     preferences + Keychain
-```
-
+- **"No API key yet":** open Settings and add a key for the provider shown in the header.
+- **API error 404 / model not found:** pick a model from the list in Settings or with Ctrl+K. Gemini and Groq lists come live from your account.
+- **Windows build error:** paste the `error CSxxxx` line. Make sure no other GlassSidebar.exe is running; `build.bat` already kills old copies.
+- **Mac: the screenshot is blank, or the mic does nothing:** check System Settings → Privacy & Security. You may need to re-run `build.sh` after granting permissions, so the signature matches.
+- **Linux: screenshots are black on Wayland:** install `grim`, or use GNOME's or KDE's own screenshot tool. Glass tries each of them in turn.

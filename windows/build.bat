@@ -1,7 +1,7 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-title Building Glass Sidebar
+title Building Glass for Windows
 
 set "FW=%WINDIR%\Microsoft.NET\Framework64\v4.0.30319"
 if not exist "%FW%\csc.exe" set "FW=%WINDIR%\Microsoft.NET\Framework\v4.0.30319"
@@ -21,7 +21,7 @@ echo Compiling with %FW%\csc.exe ...
   /lib:"%FW%\WPF" ^
   /r:PresentationFramework.dll /r:PresentationCore.dll /r:WindowsBase.dll /r:System.Xaml.dll ^
   /r:System.dll /r:System.Core.dll /r:System.Net.Http.dll /r:System.Web.Extensions.dll ^
-  /r:System.Security.dll /r:System.Windows.Forms.dll /r:System.Drawing.dll ^
+  /r:System.Security.dll /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Speech.dll ^
   /resource:src\ui.xaml,ui.xaml ^
   src\*.cs
 

@@ -6,7 +6,13 @@
     <FontFamily x:Key="UiFont">Segoe UI Variable Text, Segoe UI</FontFamily>
     <FontFamily x:Key="DisplayFont">Segoe UI Variable Display, Segoe UI</FontFamily>
 
-    <!-- round icon button (header) -->
+    <LinearGradientBrush x:Key="Orb" StartPoint="0,0" EndPoint="1,1">
+      <GradientStop Color="#FF9AE6FF" Offset="0"/>
+      <GradientStop Color="#FFB69CFF" Offset="0.55"/>
+      <GradientStop Color="#FFFFA8D9" Offset="1"/>
+    </LinearGradientBrush>
+
+    <!-- round icon button -->
     <Style x:Key="IconBtn" TargetType="Button">
       <Setter Property="Width" Value="32"/>
       <Setter Property="Height" Value="32"/>
@@ -15,23 +21,37 @@
       <Setter Property="FontSize" Value="13"/>
       <Setter Property="Cursor" Value="Hand"/>
       <Setter Property="Focusable" Value="False"/>
+      <Setter Property="Background" Value="Transparent"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Button">
-            <Border x:Name="B" CornerRadius="16" Background="Transparent" BorderBrush="Transparent" BorderThickness="1"
+            <Border x:Name="B" CornerRadius="16" Background="{TemplateBinding Background}" BorderBrush="Transparent" BorderThickness="1"
                     RenderTransformOrigin="0.5,0.5">
+              <Border.RenderTransform><ScaleTransform/></Border.RenderTransform>
               <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True">
+                <Trigger.EnterActions>
+                  <BeginStoryboard><Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="B" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1.08" Duration="0:0:0.18"><DoubleAnimation.EasingFunction><BackEase EasingMode="EaseOut" Amplitude="0.6"/></DoubleAnimation.EasingFunction></DoubleAnimation>
+                    <DoubleAnimation Storyboard.TargetName="B" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1.08" Duration="0:0:0.18"><DoubleAnimation.EasingFunction><BackEase EasingMode="EaseOut" Amplitude="0.6"/></DoubleAnimation.EasingFunction></DoubleAnimation>
+                  </Storyboard></BeginStoryboard>
+                </Trigger.EnterActions>
+                <Trigger.ExitActions>
+                  <BeginStoryboard><Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="B" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1" Duration="0:0:0.2"/>
+                    <DoubleAnimation Storyboard.TargetName="B" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1" Duration="0:0:0.2"/>
+                  </Storyboard></BeginStoryboard>
+                </Trigger.ExitActions>
                 <Setter TargetName="B" Property="Background" Value="#26FFFFFF"/>
-                <Setter TargetName="B" Property="BorderBrush" Value="#33FFFFFF"/>
+                <Setter TargetName="B" Property="BorderBrush" Value="#30FFFFFF"/>
               </Trigger>
               <Trigger Property="IsPressed" Value="True">
                 <Setter TargetName="B" Property="Background" Value="#40FFFFFF"/>
-                <Setter TargetName="B" Property="RenderTransform">
-                  <Setter.Value><ScaleTransform ScaleX="0.92" ScaleY="0.92"/></Setter.Value>
-                </Setter>
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.35"/>
               </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
@@ -39,9 +59,9 @@
       </Setter>
     </Style>
 
-    <!-- tiny action under replies (copy / retry) -->
+    <!-- tiny action under messages -->
     <Style x:Key="ActionBtn" TargetType="Button">
-      <Setter Property="Foreground" Value="#99FFFFFF"/>
+      <Setter Property="Foreground" Value="#8CFFFFFF"/>
       <Setter Property="FontFamily" Value="{StaticResource Icons}"/>
       <Setter Property="FontSize" Value="12"/>
       <Setter Property="Width" Value="28"/>
@@ -75,10 +95,12 @@
       <Setter Property="FontWeight" Value="Bold"/>
       <Setter Property="Cursor" Value="Hand"/>
       <Setter Property="Focusable" Value="False"/>
+      <Setter Property="Background" Value="#F2FFFFFF"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Button">
-            <Border x:Name="B" CornerRadius="17" Background="#F2FFFFFF" RenderTransformOrigin="0.5,0.5">
+            <Border x:Name="B" CornerRadius="17" Background="{TemplateBinding Background}" RenderTransformOrigin="0.5,0.5">
+              <Border.RenderTransform><ScaleTransform/></Border.RenderTransform>
               <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
             <ControlTemplate.Triggers>
@@ -86,12 +108,21 @@
                 <Setter TargetName="B" Property="Background" Value="White"/>
               </Trigger>
               <Trigger Property="IsPressed" Value="True">
-                <Setter TargetName="B" Property="RenderTransform">
-                  <Setter.Value><ScaleTransform ScaleX="0.9" ScaleY="0.9"/></Setter.Value>
-                </Setter>
+                <Trigger.EnterActions>
+                  <BeginStoryboard><Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="B" Storyboard.TargetProperty="RenderTransform.ScaleX" To="0.86" Duration="0:0:0.08"/>
+                    <DoubleAnimation Storyboard.TargetName="B" Storyboard.TargetProperty="RenderTransform.ScaleY" To="0.86" Duration="0:0:0.08"/>
+                  </Storyboard></BeginStoryboard>
+                </Trigger.EnterActions>
+                <Trigger.ExitActions>
+                  <BeginStoryboard><Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="B" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1" Duration="0:0:0.35"><DoubleAnimation.EasingFunction><ElasticEase Oscillations="1" Springiness="5"/></DoubleAnimation.EasingFunction></DoubleAnimation>
+                    <DoubleAnimation Storyboard.TargetName="B" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1" Duration="0:0:0.35"><DoubleAnimation.EasingFunction><ElasticEase Oscillations="1" Springiness="5"/></DoubleAnimation.EasingFunction></DoubleAnimation>
+                  </Storyboard></BeginStoryboard>
+                </Trigger.ExitActions>
               </Trigger>
               <Trigger Property="IsEnabled" Value="False">
-                <Setter TargetName="B" Property="Background" Value="#33FFFFFF"/>
+                <Setter TargetName="B" Property="Background" Value="#30FFFFFF"/>
                 <Setter Property="Foreground" Value="#80FFFFFF"/>
               </Trigger>
             </ControlTemplate.Triggers>
@@ -100,7 +131,7 @@
       </Setter>
     </Style>
 
-    <!-- pill (options, suggestion chips, model chip) -->
+    <!-- pill (options, chips) -->
     <Style x:Key="PillBtn" TargetType="Button">
       <Setter Property="Foreground" Value="#F2FFFFFF"/>
       <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
@@ -116,12 +147,27 @@
         <Setter.Value>
           <ControlTemplate TargetType="Button">
             <Border x:Name="B" CornerRadius="15" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                    BorderThickness="1" Padding="{TemplateBinding Padding}">
+                    BorderThickness="1" Padding="{TemplateBinding Padding}" RenderTransformOrigin="0.5,0.5">
+              <Border.RenderTransform><ScaleTransform/></Border.RenderTransform>
               <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center"/>
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True">
                 <Setter TargetName="B" Property="BorderBrush" Value="#66FFFFFF"/>
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Trigger.EnterActions>
+                  <BeginStoryboard><Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="B" Storyboard.TargetProperty="RenderTransform.ScaleX" To="0.95" Duration="0:0:0.08"/>
+                    <DoubleAnimation Storyboard.TargetName="B" Storyboard.TargetProperty="RenderTransform.ScaleY" To="0.95" Duration="0:0:0.08"/>
+                  </Storyboard></BeginStoryboard>
+                </Trigger.EnterActions>
+                <Trigger.ExitActions>
+                  <BeginStoryboard><Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="B" Storyboard.TargetProperty="RenderTransform.ScaleX" To="1" Duration="0:0:0.3"><DoubleAnimation.EasingFunction><BackEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction></DoubleAnimation>
+                    <DoubleAnimation Storyboard.TargetName="B" Storyboard.TargetProperty="RenderTransform.ScaleY" To="1" Duration="0:0:0.3"><DoubleAnimation.EasingFunction><BackEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction></DoubleAnimation>
+                  </Storyboard></BeginStoryboard>
+                </Trigger.ExitActions>
               </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
@@ -129,7 +175,7 @@
       </Setter>
     </Style>
 
-    <!-- row in the chat list -->
+    <!-- row in lists (chats, model menu) -->
     <Style x:Key="ListItem" TargetType="Button">
       <Setter Property="Foreground" Value="#E6FFFFFF"/>
       <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
@@ -137,10 +183,11 @@
       <Setter Property="Focusable" Value="False"/>
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="Padding" Value="12,8,8,8"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Button">
-            <Border x:Name="B" CornerRadius="12" Background="{TemplateBinding Background}" Padding="12,8,8,8" Margin="0,1">
+            <Border x:Name="B" CornerRadius="12" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" Margin="0,1">
               <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
             </Border>
             <ControlTemplate.Triggers>
@@ -182,7 +229,7 @@
       <Setter Property="CaretBrush" Value="White"/>
       <Setter Property="SelectionBrush" Value="#88A0C8FF"/>
       <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
-      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="FontSize" Value="14.5"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="TextBox">
@@ -206,6 +253,47 @@
             <ControlTemplate.Triggers>
               <Trigger Property="IsKeyboardFocused" Value="True">
                 <Setter TargetName="B" Property="BorderBrush" Value="#80FFFFFF"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- iOS-style switch -->
+    <Style x:Key="Switch" TargetType="CheckBox">
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Focusable" Value="False"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="CheckBox">
+            <Grid Background="Transparent">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+              </Grid.ColumnDefinitions>
+              <ContentPresenter VerticalAlignment="Center"/>
+              <Border x:Name="Track" Grid.Column="1" Width="42" Height="24" CornerRadius="12" Background="#33FFFFFF" BorderBrush="#40FFFFFF" BorderThickness="1">
+                <Ellipse x:Name="Knob" Width="20" Height="20" Fill="White" HorizontalAlignment="Left" Margin="1,0,0,0">
+                  <Ellipse.RenderTransform><TranslateTransform/></Ellipse.RenderTransform>
+                  <Ellipse.Effect><DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.3"/></Ellipse.Effect>
+                </Ellipse>
+              </Border>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsChecked" Value="True">
+                <Trigger.EnterActions>
+                  <BeginStoryboard><Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Knob" Storyboard.TargetProperty="RenderTransform.X" To="18" Duration="0:0:0.22"><DoubleAnimation.EasingFunction><BackEase EasingMode="EaseOut" Amplitude="0.5"/></DoubleAnimation.EasingFunction></DoubleAnimation>
+                  </Storyboard></BeginStoryboard>
+                </Trigger.EnterActions>
+                <Trigger.ExitActions>
+                  <BeginStoryboard><Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Knob" Storyboard.TargetProperty="RenderTransform.X" To="0" Duration="0:0:0.22"><DoubleAnimation.EasingFunction><BackEase EasingMode="EaseOut" Amplitude="0.5"/></DoubleAnimation.EasingFunction></DoubleAnimation>
+                  </Storyboard></BeginStoryboard>
+                </Trigger.ExitActions>
+                <Setter TargetName="Track" Property="Background" Value="#FF34C759"/>
+                <Setter TargetName="Track" Property="BorderBrush" Value="#FF34C759"/>
               </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
@@ -274,7 +362,6 @@
       <Setter Property="Padding" Value="16,6,16,16"/>
       <Setter Property="Margin" Value="0,0,0,12"/>
     </Style>
-
     <Style x:Key="CardTitle" TargetType="TextBlock">
       <Setter Property="Foreground" Value="White"/>
       <Setter Property="FontSize" Value="14"/>
@@ -282,23 +369,16 @@
       <Setter Property="FontFamily" Value="{StaticResource DisplayFont}"/>
       <Setter Property="Margin" Value="0,10,0,0"/>
     </Style>
-
     <Style x:Key="Label" TargetType="TextBlock">
       <Setter Property="Foreground" Value="#A6FFFFFF"/>
       <Setter Property="FontSize" Value="11.5"/>
       <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
       <Setter Property="Margin" Value="2,14,0,6"/>
     </Style>
-
-    <LinearGradientBrush x:Key="Orb" StartPoint="0,0" EndPoint="1,1">
-      <GradientStop Color="#FF9AE6FF" Offset="0"/>
-      <GradientStop Color="#FFB69CFF" Offset="0.55"/>
-      <GradientStop Color="#FFFFA8D9" Offset="1"/>
-    </LinearGradientBrush>
   </Grid.Resources>
 
   <Canvas x:Name="Stage" ClipToBounds="False">
-    <Grid x:Name="Panel" RenderTransformOrigin="0.5,0.5">
+    <Grid x:Name="Panel" RenderTransformOrigin="0.5,0.5" AllowDrop="True">
       <Grid.RenderTransform>
         <TransformGroup>
           <ScaleTransform x:Name="PanelScale"/>
@@ -306,15 +386,10 @@
         </TransformGroup>
       </Grid.RenderTransform>
 
-      <!-- soft shadow under the glass so it floats above the desktop -->
       <Border x:Name="Shadow" Background="#02000000" IsHitTestVisible="False">
         <Border.Effect><DropShadowEffect BlurRadius="44" ShadowDepth="10" Direction="270" Opacity="0.38" Color="Black"/></Border.Effect>
       </Border>
-
-      <!-- live refracted backdrop -->
       <Image x:Name="GlassImage" Stretch="Fill" RenderOptions.BitmapScalingMode="Linear"/>
-
-      <!-- crisp rim stroke -->
       <Border x:Name="Rim" BorderThickness="1" IsHitTestVisible="False">
         <Border.BorderBrush>
           <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
@@ -333,11 +408,11 @@
         </Grid.ColumnDefinitions>
 
         <!-- ============ chats list (fullscreen) ============ -->
-        <Border x:Name="ChatsPane" Grid.Column="0" Width="280" Visibility="Collapsed"
+        <Border x:Name="ChatsPane" Grid.Column="0" Width="284" Visibility="Collapsed"
                 BorderBrush="#1AFFFFFF" BorderThickness="0,0,1,0" Background="#0FFFFFFF" CornerRadius="30,0,0,30">
-          <Grid Margin="14,16,12,14">
+          <Border.RenderTransform><TranslateTransform x:Name="ChatsPaneShift"/></Border.RenderTransform>
+          <Grid Margin="14,18,12,14">
             <Grid.RowDefinitions>
-              <RowDefinition Height="Auto"/>
               <RowDefinition Height="Auto"/>
               <RowDefinition Height="Auto"/>
               <RowDefinition Height="Auto"/>
@@ -349,12 +424,13 @@
                          FontFamily="{StaticResource DisplayFont}"/>
             </StackPanel>
             <Button x:Name="PaneNewChat" Grid.Row="1" Style="{StaticResource PillBtn}" Margin="0,0,0,10" Padding="14,10"
-                    Background="#26FFFFFF" HorizontalAlignment="Stretch" ToolTip="New chat (Ctrl+N)">
+                    Background="#26FFFFFF" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" ToolTip="New chat (Ctrl+N)">
               <Grid>
                 <StackPanel Orientation="Horizontal">
                   <TextBlock Text="&#xE710;" FontFamily="{StaticResource Icons}" FontSize="12" VerticalAlignment="Center" Margin="0,0,10,0"/>
                   <TextBlock Text="New chat" FontWeight="SemiBold" FontSize="13.5"/>
                 </StackPanel>
+                <TextBlock Text="Ctrl+N" HorizontalAlignment="Right" Foreground="#80FFFFFF" FontSize="11" VerticalAlignment="Center"/>
               </Grid>
             </Button>
             <Grid Grid.Row="2" Margin="0,0,0,8">
@@ -364,8 +440,7 @@
               <TextBlock x:Name="ChatSearchHint" Text="Search chats" Foreground="#80FFFFFF" FontSize="13"
                          Margin="35,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
             </Grid>
-            <TextBlock Grid.Row="3" Text="Recent" Foreground="#80FFFFFF" FontSize="11.5" Margin="8,8,0,6"/>
-            <ScrollViewer Grid.Row="4" VerticalScrollBarVisibility="Hidden" Focusable="False">
+            <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Hidden" Focusable="False">
               <StackPanel x:Name="ChatList"/>
             </ScrollViewer>
           </Grid>
@@ -382,38 +457,55 @@
           <!-- header -->
           <Grid Grid.Row="0" Margin="0,0,0,6">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0,0,0">
-              <Ellipse x:Name="HeaderOrb" Width="22" Height="22" Fill="{StaticResource Orb}" Margin="0,0,10,0"/>
+              <Grid x:Name="HeaderOrbHost" Width="24" Height="24" Margin="0,0,10,0">
+                <Ellipse x:Name="HeaderOrb" Fill="{StaticResource Orb}" RenderTransformOrigin="0.5,0.5">
+                  <Ellipse.RenderTransform><ScaleTransform x:Name="HeaderOrbScale"/></Ellipse.RenderTransform>
+                </Ellipse>
+              </Grid>
               <StackPanel VerticalAlignment="Center">
                 <TextBlock x:Name="Title" Text="Glass" Foreground="White" FontSize="14.5" FontWeight="SemiBold"
-                           FontFamily="{StaticResource DisplayFont}" TextTrimming="CharacterEllipsis" MaxWidth="170"/>
+                           FontFamily="{StaticResource DisplayFont}" TextTrimming="CharacterEllipsis" MaxWidth="160"/>
                 <TextBlock x:Name="Subtitle" Text="" Foreground="#99FFFFFF" FontSize="11" FontFamily="{StaticResource UiFont}"
-                           TextTrimming="CharacterEllipsis" MaxWidth="170"/>
+                           TextTrimming="CharacterEllipsis" MaxWidth="160"/>
               </StackPanel>
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
               <Button x:Name="NewBtn" Style="{StaticResource IconBtn}" Content="&#xE932;" ToolTip="New chat (Ctrl+N)"/>
               <Button x:Name="PinBtn" Style="{StaticResource IconBtn}" Content="&#xE718;" ToolTip="Pin (stay open)"/>
-              <Button x:Name="KeyBtn" Style="{StaticResource IconBtn}" Content="&#xE713;" ToolTip="Settings"/>
-              <Button x:Name="FullBtn" Style="{StaticResource IconBtn}" Content="&#xE740;" ToolTip="Fullscreen"/>
+              <Button x:Name="KeyBtn" Style="{StaticResource IconBtn}" Content="&#xE713;" ToolTip="Settings (Ctrl+,)"/>
+              <Button x:Name="FullBtn" Style="{StaticResource IconBtn}" Content="&#xE740;" ToolTip="Fullscreen (F11)"/>
               <Button x:Name="CloseBtn" Style="{StaticResource IconBtn}" Content="&#xE8BB;" ToolTip="Close (Esc)" FontSize="10"/>
             </StackPanel>
           </Grid>
-          <Border Grid.Row="0" Height="1" VerticalAlignment="Bottom" Background="#1AFFFFFF" Margin="-16,0,-16,0"/>
+          <Border x:Name="HeaderLine" Grid.Row="0" Height="1" VerticalAlignment="Bottom" Background="#1AFFFFFF" Margin="-16,0,-16,0" Opacity="0"/>
 
           <!-- chat -->
           <Grid x:Name="ChatView" Grid.Row="1">
             <ScrollViewer x:Name="ChatScroll" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" Focusable="False">
-              <StackPanel x:Name="Messages" Margin="2,12,2,12"/>
+              <StackPanel x:Name="Messages" Margin="2,12,2,16"/>
             </ScrollViewer>
+
+            <!-- jump to latest -->
+            <Button x:Name="JumpBtn" Style="{StaticResource IconBtn}" Content="&#xE74B;" Background="#40FFFFFF" Width="34" Height="34"
+                    HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,8" Visibility="Collapsed" ToolTip="Jump to latest"/>
 
             <!-- welcome -->
             <StackPanel x:Name="Empty" VerticalAlignment="Center" Margin="6,0,6,0">
-              <Ellipse Width="46" Height="46" Fill="{StaticResource Orb}" HorizontalAlignment="Left" Margin="2,0,0,18">
-                <Ellipse.Effect><DropShadowEffect Color="#FFB69CFF" BlurRadius="26" ShadowDepth="0" Opacity="0.75"/></Ellipse.Effect>
-              </Ellipse>
-              <TextBlock x:Name="Greeting" Text="Good evening" Foreground="White" FontSize="27" FontWeight="SemiBold"
+              <Grid Width="56" Height="56" HorizontalAlignment="Left" Margin="0,0,0,18">
+                <Ellipse x:Name="WelcomeHalo" Fill="{StaticResource Orb}" Opacity="0.35" RenderTransformOrigin="0.5,0.5">
+                  <Ellipse.RenderTransform><ScaleTransform x:Name="WelcomeHaloScale"/></Ellipse.RenderTransform>
+                  <Ellipse.Effect><BlurEffect Radius="14"/></Ellipse.Effect>
+                </Ellipse>
+                <Ellipse Width="46" Height="46" Fill="{StaticResource Orb}">
+                  <Ellipse.Effect><DropShadowEffect Color="#FFB69CFF" BlurRadius="22" ShadowDepth="0" Opacity="0.7"/></Ellipse.Effect>
+                </Ellipse>
+                <Ellipse Width="20" Height="11" Fill="#B0FFFFFF" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="12,9,0,0">
+                  <Ellipse.Effect><BlurEffect Radius="3"/></Ellipse.Effect>
+                </Ellipse>
+              </Grid>
+              <TextBlock x:Name="Greeting" Text="Good evening" Foreground="White" FontSize="28" FontWeight="SemiBold"
                          FontFamily="{StaticResource DisplayFont}" Margin="2,0,0,2"/>
-              <TextBlock Text="How can I help?" Foreground="#B3FFFFFF" FontSize="22" FontFamily="{StaticResource DisplayFont}" Margin="2,0,0,22"/>
+              <TextBlock x:Name="GreetingSub" Text="How can I help?" Foreground="#B3FFFFFF" FontSize="22" FontFamily="{StaticResource DisplayFont}" Margin="2,0,0,22"/>
               <WrapPanel x:Name="Suggestions"/>
               <TextBlock x:Name="EmptyHint" Foreground="#80FFFFFF" FontSize="11.5" TextWrapping="Wrap" Margin="4,14,0,0"/>
             </StackPanel>
@@ -427,34 +519,6 @@
                 <Button x:Name="BackBtn" Style="{StaticResource PillBtn}" Content="Done" HorizontalAlignment="Right" Margin="0" Padding="14,5"/>
               </Grid>
 
-              <!-- appearance -->
-              <Border Style="{StaticResource Card}">
-                <StackPanel>
-                  <TextBlock Style="{StaticResource CardTitle}" Text="Glass"/>
-                  <TextBlock Style="{StaticResource Label}" Text="Tint"/>
-                  <WrapPanel x:Name="TintSwatches"/>
-                  <Grid Margin="0,6,0,0">
-                    <TextBox x:Name="TintHex" Style="{StaticResource Field}" Width="120" HorizontalAlignment="Left" Padding="30,7,10,7" FontSize="12.5"/>
-                    <Border x:Name="TintHexDot" Width="14" Height="14" CornerRadius="7" HorizontalAlignment="Left" Margin="10,0,0,0"
-                            BorderBrush="#80FFFFFF" BorderThickness="1" IsHitTestVisible="False"/>
-                    <TextBlock Text="Custom hex — press Enter" Foreground="#80FFFFFF" FontSize="11" Margin="132,0,0,0" VerticalAlignment="Center"/>
-                  </Grid>
-                  <Grid Margin="2,16,0,4">
-                    <TextBlock Text="Tint strength" Foreground="#A6FFFFFF" FontSize="11.5"/>
-                    <TextBlock x:Name="TintValue" Foreground="#CCFFFFFF" FontSize="11.5" HorizontalAlignment="Right"/>
-                  </Grid>
-                  <Slider x:Name="TintSlider" Style="{StaticResource GlassSlider}" Minimum="0" Maximum="0.85"/>
-                  <Grid Margin="2,12,0,4">
-                    <TextBlock Text="Blur" Foreground="#A6FFFFFF" FontSize="11.5"/>
-                    <TextBlock x:Name="BlurValue" Foreground="#CCFFFFFF" FontSize="11.5" HorizontalAlignment="Right"/>
-                  </Grid>
-                  <Slider x:Name="BlurSlider" Style="{StaticResource GlassSlider}" Minimum="0" Maximum="24"/>
-                  <Button x:Name="GlassReset" Style="{StaticResource PillBtn}" Content="Reset to semi-gray" Margin="0,12,0,0"
-                          HorizontalAlignment="Left" Padding="12,5" FontSize="11.5"/>
-                </StackPanel>
-              </Border>
-
-              <!-- connection -->
               <Border Style="{StaticResource Card}">
                 <StackPanel>
                   <TextBlock Style="{StaticResource CardTitle}" Text="AI provider"/>
@@ -489,13 +553,57 @@
                   <TextBox x:Name="ModelBox" Style="{StaticResource Field}"/>
 
                   <StackPanel x:Name="BaseUrlPanel">
-                    <TextBlock Style="{StaticResource Label}" Text="Base URL (OpenAI, OpenRouter, local…)"/>
+                    <TextBlock Style="{StaticResource Label}" Text="Base URL (OpenAI, OpenRouter, Ollama, LM Studio…)"/>
                     <TextBox x:Name="BaseUrlBox" Style="{StaticResource Field}"/>
                   </StackPanel>
                 </StackPanel>
               </Border>
 
-              <!-- behaviour -->
+              <Border Style="{StaticResource Card}">
+                <StackPanel>
+                  <TextBlock Style="{StaticResource CardTitle}" Text="Glass"/>
+                  <TextBlock Style="{StaticResource Label}" Text="Tint"/>
+                  <WrapPanel x:Name="TintSwatches"/>
+                  <Grid Margin="0,6,0,0">
+                    <TextBox x:Name="TintHex" Style="{StaticResource Field}" Width="120" HorizontalAlignment="Left" Padding="30,7,10,7" FontSize="12.5"/>
+                    <Border x:Name="TintHexDot" Width="14" Height="14" CornerRadius="7" HorizontalAlignment="Left" Margin="10,0,0,0"
+                            BorderBrush="#80FFFFFF" BorderThickness="1" IsHitTestVisible="False"/>
+                    <TextBlock Text="Custom hex — press Enter" Foreground="#80FFFFFF" FontSize="11" Margin="132,0,0,0" VerticalAlignment="Center"/>
+                  </Grid>
+                  <Grid Margin="2,16,0,4">
+                    <TextBlock Text="Tint strength" Foreground="#A6FFFFFF" FontSize="11.5"/>
+                    <TextBlock x:Name="TintValue" Foreground="#CCFFFFFF" FontSize="11.5" HorizontalAlignment="Right"/>
+                  </Grid>
+                  <Slider x:Name="TintSlider" Style="{StaticResource GlassSlider}" Minimum="0" Maximum="0.85"/>
+                  <Grid Margin="2,12,0,4">
+                    <TextBlock Text="Blur" Foreground="#A6FFFFFF" FontSize="11.5"/>
+                    <TextBlock x:Name="BlurValue" Foreground="#CCFFFFFF" FontSize="11.5" HorizontalAlignment="Right"/>
+                  </Grid>
+                  <Slider x:Name="BlurSlider" Style="{StaticResource GlassSlider}" Minimum="0" Maximum="24"/>
+                  <Button x:Name="GlassReset" Style="{StaticResource PillBtn}" Content="Reset to semi-gray" Margin="0,12,0,0"
+                          HorizontalAlignment="Left" Padding="12,5" FontSize="11.5"/>
+                </StackPanel>
+              </Border>
+
+              <Border Style="{StaticResource Card}">
+                <StackPanel>
+                  <TextBlock Style="{StaticResource CardTitle}" Text="Voice"/>
+                  <CheckBox x:Name="SpeakSwitch" Style="{StaticResource Switch}" Margin="0,14,0,0">
+                    <StackPanel>
+                      <TextBlock Text="Read replies aloud" Foreground="White" FontSize="13"/>
+                      <TextBlock Text="Voice mode turns this on automatically" Foreground="#80FFFFFF" FontSize="11"/>
+                    </StackPanel>
+                  </CheckBox>
+                  <TextBlock Style="{StaticResource Label}" Text="Voice"/>
+                  <WrapPanel x:Name="VoiceList"/>
+                  <Grid Margin="2,12,0,4">
+                    <TextBlock Text="Speaking speed" Foreground="#A6FFFFFF" FontSize="11.5"/>
+                    <TextBlock x:Name="RateValue" Foreground="#CCFFFFFF" FontSize="11.5" HorizontalAlignment="Right"/>
+                  </Grid>
+                  <Slider x:Name="RateSlider" Style="{StaticResource GlassSlider}" Minimum="-5" Maximum="5"/>
+                </StackPanel>
+              </Border>
+
               <Border Style="{StaticResource Card}">
                 <StackPanel>
                   <TextBlock Style="{StaticResource CardTitle}" Text="Behavior"/>
@@ -505,7 +613,7 @@
                     <Button x:Name="Sens1" Style="{StaticResource PillBtn}" Content="Normal"/>
                     <Button x:Name="Sens2" Style="{StaticResource PillBtn}" Content="Light"/>
                   </StackPanel>
-                  <TextBlock Style="{StaticResource Label}" Text="System prompt"/>
+                  <TextBlock Style="{StaticResource Label}" Text="Custom instructions"/>
                   <TextBox x:Name="SystemBox" Style="{StaticResource Field}" TextWrapping="Wrap" AcceptsReturn="True" MinHeight="70"/>
                 </StackPanel>
               </Border>
@@ -513,38 +621,118 @@
               <Button x:Name="SaveBtn" Style="{StaticResource SendStyle}" Width="Auto" Height="40" HorizontalAlignment="Stretch"
                       FontFamily="{StaticResource UiFont}" FontSize="13.5" FontWeight="SemiBold" Content="Save changes"/>
               <TextBlock Foreground="#80FFFFFF" FontSize="11" Margin="4,12,0,0" TextWrapping="Wrap"
-                         Text="Glass settings apply instantly. Your key is encrypted with Windows (DPAPI) and stays on this PC. Ctrl+Alt+Space toggles the sidebar; Ctrl+N starts a new chat."/>
+                         Text="Glass and voice settings apply instantly. Your key is encrypted with Windows (DPAPI) and stays on this PC."/>
+              <TextBlock Foreground="#80FFFFFF" FontSize="11" Margin="4,8,0,0" TextWrapping="Wrap"
+                         Text="Shortcuts: Ctrl+Alt+Space toggle · Ctrl+N new chat · Ctrl+K switch model · Ctrl+Shift+S ask about screen · Ctrl+Shift+V voice · F11 fullscreen · Esc close"/>
             </StackPanel>
           </ScrollViewer>
 
           <!-- composer -->
-          <Border x:Name="Composer" Grid.Row="2" Margin="0,6,0,0" CornerRadius="22" Background="#24FFFFFF"
-                  BorderBrush="#40FFFFFF" BorderThickness="1" Padding="14,10,8,8">
+          <Border x:Name="Composer" Grid.Row="2" Margin="0,6,0,0" CornerRadius="24" Background="#24FFFFFF"
+                  BorderBrush="#40FFFFFF" BorderThickness="1" Padding="12,10,8,8">
             <Grid>
               <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
               </Grid.RowDefinitions>
-              <Grid Margin="2,2,6,8">
+
+              <!-- editing banner -->
+              <Grid x:Name="EditBanner" Visibility="Collapsed" Margin="4,0,0,8">
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="&#xE70F;" FontFamily="{StaticResource Icons}" FontSize="11" Foreground="#CCFFFFFF" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                  <TextBlock Text="Editing message — Enter to resend" Foreground="#CCFFFFFF" FontSize="11.5" VerticalAlignment="Center"/>
+                </StackPanel>
+                <Button x:Name="CancelEditBtn" Style="{StaticResource ActionBtn}" Content="&#xE711;" HorizontalAlignment="Right" ToolTip="Cancel edit"/>
+              </Grid>
+
+              <!-- attachments tray -->
+              <WrapPanel x:Name="AttachTray" Grid.Row="1" Margin="0,0,0,8" Visibility="Collapsed"/>
+
+              <!-- text / voice -->
+              <Grid Grid.Row="2" Margin="4,2,6,8">
                 <TextBox x:Name="InputBox" Style="{StaticResource BareField}" TextWrapping="Wrap" AcceptsReturn="False"
                          MinHeight="22" MaxHeight="170"/>
-                <TextBlock x:Name="Placeholder" Text="Ask anything…" Foreground="#80FFFFFF" FontSize="14" Margin="2,0,0,0"
+                <TextBlock x:Name="Placeholder" Text="Ask anything…" Foreground="#80FFFFFF" FontSize="14.5" Margin="2,0,0,0"
                            FontFamily="{StaticResource UiFont}" IsHitTestVisible="False" VerticalAlignment="Top"/>
+                <Grid x:Name="VoicePanel" Visibility="Collapsed" Background="Transparent">
+                  <StackPanel x:Name="VoiceBars" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Height="26"/>
+                  <TextBlock x:Name="VoiceText" Text="Listening…" Foreground="#E6FFFFFF" FontSize="14" Margin="96,0,0,0"
+                             VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                </Grid>
               </Grid>
-              <Grid Grid.Row="1">
-                <Button x:Name="ModelChip" Style="{StaticResource PillBtn}" HorizontalAlignment="Left" Padding="10,4"
-                        FontSize="11.5" Background="#14FFFFFF" ToolTip="Change model / provider">
-                  <StackPanel Orientation="Horizontal">
-                    <Ellipse Width="7" Height="7" Fill="{StaticResource Orb}" Margin="0,0,7,0" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="ModelChipText" Text="Choose a model" MaxWidth="190" TextTrimming="CharacterEllipsis"/>
-                    <TextBlock Text="&#xE70D;" FontFamily="{StaticResource Icons}" FontSize="8" Margin="7,1,0,0" VerticalAlignment="Center" Opacity="0.7"/>
-                  </StackPanel>
-                </Button>
-                <Button x:Name="SendBtn" Style="{StaticResource SendStyle}" Content="&#xE74A;" HorizontalAlignment="Right" ToolTip="Send (Enter)"/>
+
+              <!-- toolbar -->
+              <Grid Grid.Row="3">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                  <Button x:Name="AttachBtn" Style="{StaticResource IconBtn}" Content="&#xE723;" ToolTip="Attach images, PDFs, files (or drop / paste)"/>
+                  <Button x:Name="ScreenBtn" Style="{StaticResource IconBtn}" Content="&#xE7F4;" ToolTip="Ask about my screen (Ctrl+Shift+S)"/>
+                  <Button x:Name="ModelChip" Style="{StaticResource PillBtn}" Padding="10,4" Margin="4,0,0,0"
+                          FontSize="11.5" Background="#14FFFFFF" ToolTip="Switch model (Ctrl+K)">
+                    <StackPanel Orientation="Horizontal">
+                      <Ellipse Width="7" Height="7" Fill="{StaticResource Orb}" Margin="0,0,7,0" VerticalAlignment="Center"/>
+                      <TextBlock x:Name="ModelChipText" Text="Choose a model" MaxWidth="150" TextTrimming="CharacterEllipsis"/>
+                      <TextBlock Text="&#xE70D;" FontFamily="{StaticResource Icons}" FontSize="8" Margin="7,1,0,0" VerticalAlignment="Center" Opacity="0.7"/>
+                    </StackPanel>
+                  </Button>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                  <Grid Margin="0,0,6,0">
+                    <Ellipse x:Name="MicPulse" Width="34" Height="34" Fill="#55FF453A" RenderTransformOrigin="0.5,0.5" Opacity="0" IsHitTestVisible="False">
+                      <Ellipse.RenderTransform><ScaleTransform x:Name="MicPulseScale"/></Ellipse.RenderTransform>
+                    </Ellipse>
+                    <Button x:Name="MicBtn" Style="{StaticResource IconBtn}" Content="&#xE720;" Width="34" Height="34" ToolTip="Voice mode (Ctrl+Shift+V)"/>
+                  </Grid>
+                  <Button x:Name="SendBtn" Style="{StaticResource SendStyle}" Content="&#xE74A;" ToolTip="Send (Enter)"/>
+                </StackPanel>
               </Grid>
             </Grid>
           </Border>
         </Grid>
+      </Grid>
+
+      <!-- drag & drop overlay -->
+      <Border x:Name="DropOverlay" Visibility="Collapsed" Margin="10" CornerRadius="24" Background="#33000000"
+              BorderBrush="#CCFFFFFF" BorderThickness="2" IsHitTestVisible="False">
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+          <TextBlock Text="&#xE896;" FontFamily="{StaticResource Icons}" FontSize="34" Foreground="White" HorizontalAlignment="Center"/>
+          <TextBlock Text="Drop to attach" Foreground="White" FontSize="17" FontWeight="SemiBold" Margin="0,12,0,2" HorizontalAlignment="Center"
+                     FontFamily="{StaticResource DisplayFont}"/>
+          <TextBlock Text="Images, PDFs, text and code files" Foreground="#B3FFFFFF" FontSize="12" HorizontalAlignment="Center"/>
+        </StackPanel>
+      </Border>
+
+      <!-- toast -->
+      <Border x:Name="Toast" VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,62,0,0" Padding="14,8"
+              CornerRadius="16" Background="#E6202228" BorderBrush="#40FFFFFF" BorderThickness="1" Opacity="0" IsHitTestVisible="False">
+        <Border.RenderTransform><TranslateTransform x:Name="ToastShift"/></Border.RenderTransform>
+        <TextBlock x:Name="ToastText" Foreground="White" FontSize="12.5" FontFamily="{StaticResource UiFont}" TextWrapping="Wrap" MaxWidth="320"/>
+      </Border>
+
+      <!-- quick model switcher -->
+      <Grid x:Name="ModelMenu" Visibility="Collapsed" Background="#01000000">
+        <Border x:Name="ModelMenuCard" VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="18,0,18,74" Width="300" MaxHeight="420"
+                CornerRadius="18" Background="#F21C1E24" BorderBrush="#40FFFFFF" BorderThickness="1" Padding="8" RenderTransformOrigin="0.2,1">
+          <Border.RenderTransform><ScaleTransform x:Name="ModelMenuScale"/></Border.RenderTransform>
+          <Border.Effect><DropShadowEffect BlurRadius="30" ShadowDepth="8" Direction="270" Opacity="0.45"/></Border.Effect>
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="*"/>
+              <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid Margin="0,0,0,6">
+              <TextBox x:Name="ModelFilter" Style="{StaticResource Field}" Padding="32,7,10,7" FontSize="13"/>
+              <TextBlock Text="&#xE721;" FontFamily="{StaticResource Icons}" FontSize="11" Foreground="#99FFFFFF" Margin="12,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
+              <TextBlock x:Name="ModelFilterHint" Text="Search or type a model…" Foreground="#80FFFFFF" FontSize="13" Margin="33,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
+            </Grid>
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden" Focusable="False">
+              <StackPanel x:Name="ModelMenuList"/>
+            </ScrollViewer>
+            <TextBlock x:Name="ModelMenuStatus" Grid.Row="2" Foreground="#80FFFFFF" FontSize="11" Margin="10,6,0,2" TextWrapping="Wrap"/>
+          </Grid>
+        </Border>
       </Grid>
     </Grid>
   </Canvas>

@@ -1,8 +1,6 @@
 using System;
 using System.Diagnostics;
-using System.IO;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -15,7 +13,7 @@ using Drawing = System.Drawing;
 
 namespace GlassSidebar
 {
-    // Simple damped spring for buttery motion with a hint of overshoot.
+    // Damped spring for buttery motion with a hint of overshoot.
     internal struct Spring
     {
         public double X, V, Target;
@@ -36,7 +34,7 @@ namespace GlassSidebar
 
     internal sealed partial class SidebarWindow : Window
     {
-        const double PanelWidthDip = 420, GapDip = 12, RadiusDip = 30, FullInsetDip = 14;
+        const double PanelWidthDip = 430, GapDip = 12, RadiusDip = 30, FullInsetDip = 14;
 
         enum Mode { Hidden, Sidebar, Full }
         Mode mode = Mode.Hidden;
@@ -52,18 +50,23 @@ namespace GlassSidebar
         double lastT;
         double tintA = 0.3;
 
+        // edge glow (voice listening / AI thinking)
+        double glow, glowTarget, micLevel;
+        byte glowR = 182, glowG = 156, glowB = 255;
+
         readonly ScreenCapture capture = new ScreenCapture();
         WriteableBitmap wb;
         bool excludeOk;
 
-        // UI elements from ui.xaml
         Grid root, panel, content, chatView;
         FrameworkElement composer;
         Canvas stage;
         Image glassImage;
         Border rim;
-        ScaleTransform panelScale;
+        ScaleTransform panelScale, headerOrbScale;
         Button pinBtn, fullBtn;
+
+        static string G(int code) { return ((char)code).ToString(); }
 
         public SidebarWindow()
         {
@@ -76,7 +79,8 @@ namespace GlassSidebar
             ShowActivated = true;
             Title = "Glass";
             UseLayoutRounding = true;
-            TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
+            TextOptions.SetTextFormattingMode(this, TextFormattingMode.Ideal);
+            TextOptions.SetTextRenderingMode(this, TextRenderingMode.Grayscale); // smooth on transparent windows
 
             using (var s = Assembly.GetExecutingAssembly().GetManifestResourceStream("ui.xaml"))
                 root = (Grid)XamlReader.Load(s);
@@ -89,6 +93,7 @@ namespace GlassSidebar
             glassImage = F<Image>("GlassImage");
             rim = F<Border>("Rim");
             panelScale = (ScaleTransform)root.FindName("PanelScale");
+            headerOrbScale = (ScaleTransform)root.FindName("HeaderOrbScale");
             pinBtn = F<Button>("PinBtn");
             fullBtn = F<Button>("FullBtn");
             rim.CornerRadius = new CornerRadius(RadiusDip);
@@ -99,19 +104,17 @@ namespace GlassSidebar
             pinBtn.Click += delegate
             {
                 pinned = !pinned;
-                pinBtn.Content = pinned ? "" : "";
+                pinBtn.Content = G(pinned ? 0xE840 : 0xE718);
                 pinBtn.ToolTip = pinned ? "Unpin" : "Pin (stay open)";
-                pinBtn.Content = pinned ? "" : "";
+                ShowToast(pinned ? "Pinned — Glass stays open" : "Unpinned");
             };
-
-            pinBtn.Click += delegate { pinBtn.Content = G(pinned ? 0xE840 : 0xE718); }; // pinned / unpinned icon
 
             InitChat();
 
             SourceInitialized += OnSourceInitialized;
             Deactivated += delegate
             {
-                if (!pinned && !suppressDeactivate && mode != Mode.Hidden) HidePanel();
+                if (!pinned && !suppressDeactivate && mode != Mode.Hidden && !(voice != null && voice.Listening)) HidePanel();
             };
             PreviewKeyDown += OnPreviewKeyDown;
         }
@@ -125,8 +128,7 @@ namespace GlassSidebar
             scale = src.CompositionTarget.TransformToDevice.M11;
             int ex = Native.GetWindowLong(hwnd, Native.GWL_EXSTYLE);
             Native.SetWindowLong(hwnd, Native.GWL_EXSTYLE, ex | Native.WS_EX_TOOLWINDOW);
-            // The key trick: our window is invisible to screen capture, so we can
-            // capture what's *behind* it every frame and refract it in real time.
+            // the key trick: invisible to screen capture, so we can capture what's *behind* us every frame
             excludeOk = Native.SetWindowDisplayAffinity(hwnd, Native.WDA_EXCLUDEFROMCAPTURE);
             if (!excludeOk) // pre-2004 Windows: no live capture possible, fall back to a tinted panel
                 panel.Background = new SolidColorBrush(Color.FromArgb(0xE6, 0x1C, 0x1E, 0x28));
@@ -141,8 +143,7 @@ namespace GlassSidebar
                 if (mode == Mode.Hidden || hiding)
                 {
                     Native.POINT p; Native.GetCursorPos(out p);
-                    var scr = Forms.Screen.FromPoint(new Drawing.Point(p.X, p.Y));
-                    ShowPanel(1, scr);
+                    ShowPanel(1, Forms.Screen.FromPoint(new Drawing.Point(p.X, p.Y)));
                 }
                 else HidePanel();
                 handled = true;
@@ -177,7 +178,8 @@ namespace GlassSidebar
             if (wasHidden)
             {
                 sx.Snap(off.X); sy.Snap(off.Y); sw.Snap(off.Width); sh.Snap(off.Height);
-                tintA = 0.3;
+                tintA = settings.TintStrength;
+                content.Opacity = 0;
             }
             SetTargets(shown);
             SetFullUi(false);
@@ -185,18 +187,16 @@ namespace GlassSidebar
             Show();
             ForceForeground();
             InputFocus();
+            Animate.Fade(content, 1, wasHidden ? 380 : 200, wasHidden ? 90 : 0);
         }
 
         public void HidePanel()
         {
             if (mode == Mode.Hidden) return;
-            if (mode == Mode.Full)
-            {
-                // collapse back to the sidebar first, then slide away
-                mode = Mode.Sidebar;
-                SetFullUi(false);
-            }
+            CloseModelMenu();
+            if (mode == Mode.Full) { mode = Mode.Sidebar; SetFullUi(false); }
             hiding = true;
+            Animate.Fade(content, 0, 160);
             SetTargets(HiddenTarget());
         }
 
@@ -219,14 +219,12 @@ namespace GlassSidebar
 
         void SetFullUi(bool full)
         {
-            fullBtn.Content = full ? "" : "";
-            fullBtn.ToolTip = full ? "Exit fullscreen" : "Fullscreen";
-            fullBtn.Content = full ? "" : "";
-            double max = full ? 820 : double.PositiveInfinity;
+            fullBtn.Content = G(full ? 0xE73F : 0xE740);
+            fullBtn.ToolTip = full ? "Exit fullscreen (F11)" : "Fullscreen (F11)";
+            double max = full ? 860 : double.PositiveInfinity;
             chatView.MaxWidth = max; composer.MaxWidth = max;
-            fullBtn.Content = G(full ? 0xE73F : 0xE740); // back-to-window / fullscreen icon
+            F<ScrollViewer>("SettingsView").MaxWidth = full ? 600 : double.PositiveInfinity;
             ShowChatsPane(full);
-            F<ScrollViewer>("SettingsView").MaxWidth = full ? 560 : double.PositiveInfinity;
         }
 
         Drawing.Rectangle StripRect()
@@ -268,21 +266,42 @@ namespace GlassSidebar
         void ForceForeground()
         {
             // Windows blocks focus stealing; a synthetic Alt tap unlocks SetForegroundWindow.
-            keybd_event(0x12, 0, 0, UIntPtr.Zero);
-            keybd_event(0x12, 0, 2, UIntPtr.Zero);
+            Native.keybd_event(Native.VK_MENU, 0, 0, UIntPtr.Zero);
+            Native.keybd_event(Native.VK_MENU, 0, 2, UIntPtr.Zero);
             Activate();
             if (hwnd != IntPtr.Zero) Native.SetForegroundWindow(hwnd);
         }
 
-        [DllImport("user32.dll")] static extern void keybd_event(byte vk, byte scan, int flags, UIntPtr extra);
+        Forms.Screen CurrentScreen()
+        {
+            return Forms.Screen.FromRectangle(new Drawing.Rectangle((int)sx.X, (int)sy.X, Math.Max(1, (int)sw.X), Math.Max(1, (int)sh.X)));
+        }
 
         void OnPreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key != Key.Escape) return;
-            e.Handled = true;
-            if (InSettings) { ShowSettings(false); return; }
-            if (mode == Mode.Full) { ToggleFull(); return; }
-            HidePanel();
+            bool ctrl = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
+            bool shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+            Key key = e.Key == Key.System ? e.SystemKey : e.Key;
+
+            if (key == Key.Escape)
+            {
+                e.Handled = true;
+                if (ModelMenuOpen) { CloseModelMenu(); return; }
+                if (voice != null && voice.Listening) { StopVoice(); return; }
+                if (editingIndex >= 0) { CancelEdit(); return; }
+                if (InSettings) { ShowSettings(false); return; }
+                if (mode == Mode.Full) { ToggleFull(); return; }
+                HidePanel();
+                return;
+            }
+            if (key == Key.F11) { ToggleFull(); e.Handled = true; return; }
+            if (!ctrl) return;
+            if (key == Key.N && !shift) { NewChat(); InputFocus(); e.Handled = true; }
+            else if (key == Key.K) { ToggleModelMenu(); e.Handled = true; }
+            else if (key == Key.OemComma) { ShowSettings(!InSettings); e.Handled = true; }
+            else if (key == Key.S && shift) { AskAboutScreen(); e.Handled = true; }
+            else if (key == Key.V && shift) { ToggleVoice(); e.Handled = true; }
+            else if (key == Key.O) { PickFiles(); e.Handled = true; }
         }
 
         // ---------------- per-frame: springs + live refraction ----------------
@@ -308,7 +327,6 @@ namespace GlassSidebar
             double dt = Math.Min(0.05, Math.Max(0.001, t - lastT));
             lastT = t;
 
-            // snappy, slightly bouncy slide; size morphs a touch softer
             double zeta = hiding ? 1.0 : 0.72;
             sx.Step(dt, 210, zeta); sy.Step(dt, 210, 0.85);
             sw.Step(dt, 170, 0.82); sh.Step(dt, 170, 0.82);
@@ -327,6 +345,17 @@ namespace GlassSidebar
             panelScale.ScaleX = 1 + 0.06 * v;
             panelScale.ScaleY = 1 - 0.035 * v;
 
+            // edge glow: voice = warm pulse driven by mic level, thinking = slow violet breathing
+            bool listening = voice != null && voice.Listening;
+            if (listening) { glowR = 255; glowG = 92; glowB = 110; glowTarget = 0.45 + 0.55 * micLevel; }
+            else if (streamCts != null) { glowR = 170; glowG = 150; glowB = 255; glowTarget = 0.35 + 0.25 * Math.Sin(t * 3.2); }
+            else glowTarget = 0;
+            glow += (glowTarget - glow) * Math.Min(1, dt * 9);
+
+            // header orb breathes while the AI works
+            double orb = streamCts != null ? 1 + 0.12 * Math.Sin(t * 6) : 1;
+            headerOrbScale.ScaleX = headerOrbScale.ScaleY = orb;
+
             int px = (int)Math.Round(sx.X), py = (int)Math.Round(sy.X);
             int pw = Math.Max(40, (int)Math.Round(sw.X)), ph = Math.Max(40, (int)Math.Round(sh.X));
 
@@ -335,6 +364,7 @@ namespace GlassSidebar
             panel.Width = pw / scale; panel.Height = ph / scale;
 
             RenderGlass(px, py, pw, ph);
+            OnFrameUi(t, dt);
         }
 
         void RenderGlass(int px, int py, int pw, int ph)
@@ -346,18 +376,17 @@ namespace GlassSidebar
             int M = (int)Math.Ceiling(amp * 1.2 + 6 + settings.Blur * scale);
 
             int cx = px - M, cy = py - M, cw = pw + 2 * M, ch = ph + 2 * M;
+            if (!excludeOk) { glassImage.Source = null; return; }
             capture.Capture(cx, cy, cw, ch, s);
             int bw = capture.W, bh = capture.H;
 
-            // Only the on-screen part of the capture is valid; samples clamp to it.
+            // only the on-screen part of the capture is valid; samples clamp to it
             var vs = Forms.SystemInformation.VirtualScreen;
             var v = new ValidRect();
             v.X0 = Clamp((int)Math.Ceiling((vs.Left - cx) * s), 0, bw - 1);
             v.Y0 = Clamp((int)Math.Ceiling((vs.Top - cy) * s), 0, bh - 1);
             v.X1 = Clamp((int)Math.Floor((vs.Right - cx) * s), v.X0 + 1, bw);
             v.Y1 = Clamp((int)Math.Floor((vs.Bottom - cy) * s), v.Y0 + 1, bh);
-
-            if (!excludeOk) { glassImage.Source = null; return; }
 
             Glass.Blur(capture.Bits, capture.Temp, bw, bh, v, blur);
 
@@ -375,7 +404,8 @@ namespace GlassSidebar
             wb.Lock();
             Glass.Refract(capture.Bits, bw, v, (int)Math.Round(M * s), wb.BackBuffer, wb.BackBufferStride, ow, oh,
                           (float)(RadiusDip * scale * s), (float)(bezel * s), (float)(amp * s), (float)(scale * s),
-                          (float)tintA, (byte)settings.TintR, (byte)settings.TintG, (byte)settings.TintB);
+                          (float)tintA, (byte)settings.TintR, (byte)settings.TintG, (byte)settings.TintB,
+                          (float)Math.Max(0, glow), glowR, glowG, glowB);
             wb.AddDirtyRect(new Int32Rect(0, 0, ow, oh));
             wb.Unlock();
         }
@@ -387,6 +417,7 @@ namespace GlassSidebar
             StopRendering();
             if (hwnd != IntPtr.Zero) Native.UnregisterHotKey(hwnd, 1);
             capture.Dispose();
+            if (voice != null) voice.Dispose();
             base.OnClosed(e);
         }
     }

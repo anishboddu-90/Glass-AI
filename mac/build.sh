@@ -1,37 +1,26 @@
-#!/bin/bash
-# Builds Glass.app for macOS — no Xcode project needed, just the Command Line Tools.
-#   chmod +x build.sh && ./build.sh
+#!/usr/bin/env bash
+# Builds Glass.app with the Swift compiler from Xcode or the Command Line Tools:
+#   ./build.sh            → build/Glass.app, then launches it
+#   ./build.sh install    → also copies it to /Applications
+# Needs macOS 14+. Liquid Glass (live refraction) turns on automatically on macOS 26
+# when built with Xcode 26 / Swift 6.2; older setups get the vibrancy fallback.
 set -euo pipefail
 cd "$(dirname "$0")"
 
-APP="Glass.app"
-MIN_OS="14.0"
-
-if ! command -v swiftc >/dev/null 2>&1; then
-  echo "Swift compiler not found. Install the tools with:  xcode-select --install"
-  exit 1
-fi
-
-echo "→ Closing any running copy…"
+APP=build/Glass.app
+ARCH=$(uname -m)
 pkill -x Glass 2>/dev/null || true
-
-echo "→ Compiling ($(swiftc --version 2>&1 | head -n1))"
-rm -rf build "$APP"
-mkdir -p build
-
-ARCHS=(arm64 x86_64)
-for arch in "${ARCHS[@]}"; do
-  swiftc -O -parse-as-library -swift-version 5 \
-    -target "${arch}-apple-macos${MIN_OS}" \
-    -framework AppKit -framework SwiftUI -framework Carbon -framework Security \
-    Sources/*.swift -o "build/Glass-${arch}"
-done
-lipo -create build/Glass-arm64 build/Glass-x86_64 -output build/Glass   # universal: Apple silicon + Intel
-
-echo "→ Packaging ${APP}"
+rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp build/Glass "$APP/Contents/MacOS/Glass"
-cat > "$APP/Contents/Info.plist" <<PLIST
+
+echo "→ Compiling ($ARCH)…"
+swiftc -O -parse-as-library -swift-version 5 \
+  -target "$ARCH-apple-macos14.0" \
+  -framework AppKit -framework SwiftUI -framework ScreenCaptureKit \
+  -framework Speech -framework AVFoundation -framework Carbon \
+  Sources/*.swift -o "$APP/Contents/MacOS/Glass"
+
+cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -41,17 +30,27 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleIdentifier</key><string>com.glass.sidebar</string>
   <key>CFBundleExecutable</key><string>Glass</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.0</string>
-  <key>CFBundleVersion</key><string>1</string>
-  <key>LSMinimumSystemVersion</key><string>${MIN_OS}</string>
+  <key>CFBundleShortVersionString</key><string>2.0</string>
+  <key>CFBundleVersion</key><string>2</string>
+  <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
+  <key>NSMicrophoneUsageDescription</key><string>Glass listens when you use dictation or voice mode.</string>
+  <key>NSSpeechRecognitionUsageDescription</key><string>Glass turns your speech into text for dictation and voice mode.</string>
+  <key>NSScreenCaptureUsageDescription</key><string>Glass takes a screenshot when you ask about your screen.</string>
 </dict>
 </plist>
 PLIST
 
-# ad-hoc signature so macOS will run it locally and Keychain access works
+# ad-hoc signature so macOS remembers the permissions you grant
 codesign --force --deep --sign - "$APP" >/dev/null
 
-echo "✓ Built $(pwd)/$APP — launching."
+if [[ "${1:-}" == "install" ]]; then
+  rm -rf /Applications/Glass.app
+  cp -R "$APP" /Applications/
+  APP=/Applications/Glass.app
+  echo "✓ Installed to /Applications"
+fi
+
+echo "✓ Built $APP"
 open "$APP"

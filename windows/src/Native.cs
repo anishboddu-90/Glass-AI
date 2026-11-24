@@ -18,15 +18,13 @@ namespace GlassSidebar
         }
 
         public const int SRCCOPY = 0x00CC0020;
-        public const int CAPTUREBLT = 0x40000000;
+        public const uint WDA_NONE = 0x0;
         public const uint WDA_EXCLUDEFROMCAPTURE = 0x11;
-        public const int VK_LBUTTON = 0x01;
-        public const int VK_RBUTTON = 0x02;
+        public const int VK_LBUTTON = 0x01, VK_RBUTTON = 0x02, VK_MENU = 0x12;
         public const int GWL_EXSTYLE = -20;
         public const int WS_EX_TOOLWINDOW = 0x80;
-        public const int WS_EX_NOACTIVATE = 0x08000000;
         public const int WM_HOTKEY = 0x0312;
-        public const uint MOD_ALT = 1, MOD_CONTROL = 2, MOD_NOREPEAT = 0x4000;
+        public const uint MOD_ALT = 1, MOD_CONTROL = 2, MOD_SHIFT = 4, MOD_NOREPEAT = 0x4000;
 
         [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT p);
         [DllImport("user32.dll")] public static extern short GetAsyncKeyState(int vKey);
@@ -39,6 +37,7 @@ namespace GlassSidebar
         [DllImport("user32.dll")] public static extern bool UnregisterHotKey(IntPtr hwnd, int id);
         [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
         [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd);
+        [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, int flags, UIntPtr extra);
 
         [DllImport("gdi32.dll")] public static extern IntPtr CreateCompatibleDC(IntPtr hdc);
         [DllImport("gdi32.dll")] public static extern bool DeleteDC(IntPtr hdc);
